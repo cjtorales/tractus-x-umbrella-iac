@@ -26,18 +26,18 @@ jobs:
     if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           ref: ${{ github.event.workflow_run.head_sha || github.ref }}
-      - uses: opentofu/setup-opentofu@v1
+      - uses: opentofu/setup-opentofu@v2
         with:
           tofu_version: ${{ env.TOFU_VERSION }}
-      - uses: gruntwork-io/terragrunt-action@v2
+      - uses: gruntwork-io/terragrunt-action@v3
         with:
           tg_version: ${{ env.TG_VERSION }}
           tofu_version: ${{ env.TOFU_VERSION }}
           tg_command: --version
-      - uses: azure/login@v2
+      - uses: azure/login@v3
         with:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
@@ -48,11 +48,32 @@ jobs:
           set -o pipefail
           make plan-all 2>&1 | tee plan_raw.txt
       - name: Build PR comment
-        if: ${{ github.event.workflow_run.event == 'pull_request' }}
+        if: ${{ always() && github.event.workflow_run.event == 'pull_request' }}
+        env:
+          PLAN_OUTCOME: ${{ steps.plan.outcome }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+          HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
+          TRIGGER_ACTOR: ${{ github.event.workflow_run.actor.login }}
+          WORKFLOW: ${{ github.workflow }}
         run: |
           {
             echo '## OpenTofu plan (`run-all`)'
-            echo '<details><summary>Show plan</summary>'
+            echo
+            echo '| | |'
+            echo '|---|---|'
+            echo "| Status | \`${PLAN_OUTCOME}\` |"
+            echo "| Stacks | \`${TG_DIR}\` |"
+            echo "| Branch | \`${HEAD_BRANCH}\` |"
+            echo "| Commit | \`${HEAD_SHA}\` |"
+            echo "| Triggered by | @${TRIGGER_ACTOR} |"
+            echo "| Workflow | \`${WORKFLOW}\` |"
+            echo
+            echo '### Per-stack summary'
+            echo '```'
+            grep -hE 'Plan: [0-9]+ to add|No changes\.' plan_raw.txt || echo '(no summary lines found — see full plan)'
+            echo '```'
+            echo
+            echo '<details><summary>Show full plan</summary>'
             echo
             echo '```'
             tail -c 60000 plan_raw.txt
@@ -60,8 +81,8 @@ jobs:
             echo '</details>'
           } > plan_comment.md
       - name: Comment plan on PR
-        if: ${{ github.event.workflow_run.event == 'pull_request' }}
-        uses: marocchino/sticky-pull-request-comment@v2
+        if: ${{ always() && github.event.workflow_run.event == 'pull_request' }}
+        uses: marocchino/sticky-pull-request-comment@v3
         with:
           header: tofu-plan
           number: ${{ github.event.workflow_run.pull_requests[0].number }}
