@@ -63,9 +63,6 @@ make import          # resource-group and remote-state first, then the rest
 make verify-import   # expects "No changes" across all stacks
 ```
 
-> ⚠️ Import only applies if the live resources are already in `westeurope`. If they are in another
-> region, aligning to `westeurope` means recreating, not importing.
-
 If a `plan` shows drift, adjust the **code** to match the live resource before applying.
 
 ## CI/CD
