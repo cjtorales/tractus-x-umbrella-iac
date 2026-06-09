@@ -1,43 +1,51 @@
 # tractus-x-umbrella-iac
 
-Infrastructure as Code for the **dev** environment of Tractus-X Umbrella on **Azure**
-(region `westeurope`), managed with **OpenTofu** + **Terragrunt**.
+Infrastructure as Code for Tractus-X Umbrella, managed with **OpenTofu** + **Terragrunt**.
+Modular, multi-cloud- and multi-stage-ready, with a chained CI/CD pipeline that runs only the
+affected stacks and promotes changes through stages with a manual gate.
 
 The whole pipeline uses the `tofu` binary: every `terragrunt.hcl` sets
-`terraform_binary = "tofu"` and providers come from the OpenTofu registry
-(`source = "opentofu/azurerm"`).
+`terraform_binary = "tofu"` and providers come from the OpenTofu registry.
 
 ## Structure
 
 ```
 iac/
-├── modules/azure/        # Reusable modules
-│   ├── resource-group/   # Resource Group
-│   ├── remote-state/     # Storage account + container for the tfstate
-│   ├── networking/       # VNet, AKS subnet, NSG and association
-│   ├── identity/         # User-assigned managed identity (UAMI)
-│   ├── dns/              # Private DNS zone
-│   └── cluster/          # AKS: system + workloads node pools, UAMI, autoscaler
-└── live/azure/dev/       # Terragrunt stacks (one state per folder)
-    ├── resource-group/   # local backend (bootstrap)
-    ├── remote-state/     # local backend (bootstrap)
+├── modules/<cloud>/         # Reusable modules
+│   ├── resource-group/      # Resource group
+│   ├── remote-state/        # State backend (storage + container)
+│   ├── networking/          # Network, subnet, security group
+│   ├── identity/            # Managed identity
+│   ├── dns/                 # DNS zone
+│   └── cluster/             # Managed Kubernetes cluster: system + workloads pools, autoscaler
+└── live/<cloud>/<stage>/    # Terragrunt stacks (one state per folder)
+    ├── resource-group/      # local backend (bootstrap)
+    ├── remote-state/        # local backend (bootstrap)
     ├── networking/
     ├── identity/
     ├── dns/
-    └── cluster/          # depends on resource-group + networking + identity
+    └── cluster/             # depends on resource-group + networking + identity
 ```
-
-Cluster spec (doc 04): k8s 1.30, Free tier, system pool `Standard_D2s_v3` x2,
-workloads pool `Standard_D4s_v3` x2 with autoscaler, UAMI assigned to AKS.
 
 ## Prerequisites
 
-```bash
-asdf install          # or: mise install  (tooling pinned in .tool-versions)
-make tools            # tofu / terragrunt / tflint
+Install locally (with your tool manager of choice, e.g. `asdf` / `mise`, or manually):
 
-# azurerm v4 REQUIRES the subscription id:
-az login
+| Tool | Version |
+|---|---|
+| OpenTofu | 1.9.0 |
+| Terragrunt | 0.69.0 |
+| TFLint | 0.52.0 |
+| Trivy | latest |
+| Checkov | latest |
+
+> CI pins its own versions in each workflow's `env:` block — keep them in sync.
+
+```bash
+make tools            # prints installed tofu / terragrunt / tflint versions
+
+# Authenticate to your cloud and export the credentials the provider needs
+# (e.g. the subscription/account id):
 export ARM_SUBSCRIPTION_ID="<SUBSCRIPTION_ID>"
 ```
 
@@ -55,7 +63,8 @@ make trivy checkov              # security + compliance
 ## Importing existing resources
 
 Every stack has a `generate "imports"` block with OpenTofu `import {}` blocks, **gated by
-`TG_ENABLE_IMPORT`**. Azure IDs are built from `ARM_SUBSCRIPTION_ID` (no `az` calls).
+`TG_ENABLE_IMPORT`**. Resource IDs are built from the exported subscription/account id (no extra
+CLI calls).
 
 ```bash
 export ARM_SUBSCRIPTION_ID="<SUBSCRIPTION_ID>"
@@ -67,7 +76,7 @@ If a `plan` shows drift, adjust the **code** to match the live resource before a
 
 ## CI/CD
 
-Three workflows in `.github/workflows/`, **chained with `workflow_run`** (Azure OIDC login).
+Three workflows in `.github/workflows/`, **chained with `workflow_run`** (cloud OIDC login).
 Only the **affected** `cloud/stage` combos run, and apply **promotes dev → prod** with a manual gate:
 
 ```
@@ -85,8 +94,8 @@ The CI calls the **same `make` targets** used locally (single source of truth); 
 Checkov run as dedicated marketplace actions. Full details (affected detection, promotion,
 multi-cloud) in **[`.github/workflows/README.md`](.github/workflows/README.md)**.
 
-> - Today only `{ cloud: azure, stage: dev }` exists; `prod` / other providers light up automatically
->   once their `iac/live/<cloud>/<stage>/` stacks are created.
+> - New `cloud/stage` combos light up automatically once their `iac/live/<cloud>/<stage>/` stacks
+>   are created — no workflow edits needed for a new stage of an existing cloud.
 > - Set up Environments `dev` and `prod` (Settings → Environments); add **required reviewers** to
 >   `prod` for the manual gate.
 > - `workflow_run` workflows run with the definition from the **default branch** (main).
@@ -100,7 +109,7 @@ multi-cloud) in **[`.github/workflows/README.md`](.github/workflows/README.md)**
   storage account that holds the other stacks' state.
 - **Variable contract** aligned to the doc: `region`, `environment`, `node_count_system`,
   `node_count_workloads`, `machine_type`.
-- **Identity → cluster**: the cluster uses the `identity` module's **UAMI** (`UserAssigned`) and
-  assigns it the `Network Contributor` role on the subnet (Azure CNI requirement).
+- **Identity → cluster**: the cluster consumes the `identity` module's managed identity and is granted
+  the network role on the subnet (CNI requirement).
 - **Terragrunt hooks**: `before_hook` `tofu validate` and `after_hook` `tofu test` on `apply`.
 - **Import gated by `TG_ENABLE_IMPORT`**: `imports.tf` is generated at runtime, not versioned.

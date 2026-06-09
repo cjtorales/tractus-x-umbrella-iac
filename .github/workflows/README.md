@@ -24,8 +24,7 @@ emits a matrix of only the impacted combos:
 
 - `iac/live/<cloud>/<stage>/**` changed → that combo.
 - `iac/modules/<cloud>/**` changed → all stages of that cloud.
-- a global file (`iac/live/terragrunt.hcl`, `iac/.tflint.hcl`, `Makefile`, `.tool-versions`,
-  `.github/**`) → all combos.
+- a global file (`iac/live/terragrunt.hcl`, `iac/.tflint.hcl`, `Makefile`, `.github/**`) → all combos.
 - `workflow_dispatch` → all existing combos.
 
 The matrix is uploaded as the `affected` artifact and consumed downstream across the `workflow_run`
@@ -39,10 +38,48 @@ skipped.
 
 ## Repo settings required
 
-- **Branch protection**: mark `validate` / `test` / `plan` as *required status checks*.
-- **Environments** (Settings → Environments):
-  - `dev` — optional reviewers.
-  - `prod` — add **required reviewers** so `apply-prod` waits for **manual approval**.
+### 1. Secrets (Settings → Secrets and variables → Actions)
+
+| Secret | Purpose |
+|---|---|
+| `AZURE_CLIENT_ID` | App registration (OIDC) |
+| `AZURE_TENANT_ID` | Entra ID tenant |
+| `AZURE_SUBSCRIPTION_ID` | Target subscription |
+
+`GITHUB_TOKEN` is automatic. Add `GCP_*` / `AWS_*` only when those clouds are introduced.
+
+### 2. Cloud OIDC federation (no client secret)
+
+Workflows use `ARM_USE_OIDC: true` + `azure/login` with OIDC. On the cloud side:
+
+- An App registration / Service Principal.
+- **Federated credentials** for GitHub, one per subject:
+  - `repo:<org>/<repo>:ref:refs/heads/main`
+  - `repo:<org>/<repo>:pull_request`
+  - `repo:<org>/<repo>:environment:dev`
+  - `repo:<org>/<repo>:environment:prod`
+- The role assignments the stacks need (resource management, role assignment for the cluster identity,
+  DNS management) on the target scope.
+
+### 3. Environments (Settings → Environments)
+
+- `dev` — optional reviewers.
+- `prod` — add **required reviewers** so `apply-prod` waits for **manual approval**. Scope
+  per-environment secrets here if dev/prod use different subscriptions.
+
+### 4. Branch protection (on `main`)
+
+- Require a pull request before merging.
+- **Required status checks**: `validate`, `test`, `plan`.
+  > With the matrix, check names include the combo (e.g. `validate (azure, dev)`).
+- Require branches to be up to date before merging.
+
+### 5. Actions settings (Settings → Actions → General)
+
+- **Allowed actions**: permit `actions/*`, `opentofu/*`, `gruntwork-io/*`, `terraform-linters/*`,
+  `azure/*`, `aquasecurity/*`, `bridgecrewio/*`, `marocchino/*` (or allow all).
+- Workflow permissions: default is fine — each workflow declares its own (`id-token: write`,
+  `pull-requests: write`, `actions: read`).
 - `workflow_run` workflows run with the definition from the **default branch**: changes to those YAML
   files only take effect once merged.
 

@@ -8,7 +8,7 @@
 #       iac/live/<cloud>/<stage>/**   (that combo)
 #       iac/modules/<cloud>/**        (all stages of that cloud)
 #     or a global file changed (root terragrunt.hcl, .tflint.hcl, Makefile,
-#     .tool-versions, .github/**) -> all combos.
+#     .github/**) -> all combos.
 set -euo pipefail
 
 BASE="${1:-}"
@@ -23,7 +23,7 @@ else
   changed="$(git diff --name-only "$BASE" "$HEAD" 2>/dev/null || echo __ALL__)"
 fi
 
-global_re='^(iac/live/terragrunt\.hcl|iac/\.tflint\.hcl|Makefile|\.tool-versions|\.github/)'
+global_re='^(iac/live/terragrunt\.hcl|iac/\.tflint\.hcl|Makefile|\.github/)'
 force_all=false
 if [ "$changed" = "__ALL__" ]; then
   force_all=true
