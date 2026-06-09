@@ -1,7 +1,8 @@
 name: iac-apply
 
 # Chained: runs when iac-plan completes successfully on main.
-# Gated by the "dev" environment (required reviewers) -> apply with approval.
+# Promotion: apply-dev first, then apply-prod (gated by the "prod" environment
+# = required reviewers => manual approval). Only affected cloud/stage combos run.
 on:
   workflow_run:
     workflows: ["iac-plan"]
@@ -11,9 +12,9 @@ on:
 permissions:
   id-token: write
   contents: read
+  actions: read
 
 env:
-  TG_DIR: iac/live/azure/dev
   TOFU_VERSION: 1.9.0
   TG_VERSION: 0.69.0
   ARM_USE_OIDC: "true"
@@ -22,13 +23,52 @@ env:
   ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
 
 jobs:
-  apply:
+  load:
     if: >
       github.event_name == 'workflow_dispatch' ||
       (github.event.workflow_run.conclusion == 'success' &&
        github.event.workflow_run.head_branch == 'main')
     runs-on: ubuntu-latest
+    outputs:
+      dev: ${{ steps.l.outputs.dev }}
+      prod: ${{ steps.l.outputs.prod }}
+      has_dev: ${{ steps.l.outputs.has_dev }}
+      has_prod: ${{ steps.l.outputs.has_prod }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.ref }}
+          fetch-depth: 0
+      - name: Download affected matrix (from iac-plan run)
+        if: ${{ github.event_name == 'workflow_run' }}
+        uses: actions/download-artifact@v4
+        with:
+          name: affected
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+      - id: l
+        run: |
+          if [ ! -f affected.json ]; then
+            bash .github/scripts/affected.sh "" "" > affected.json
+          fi
+          DEV="$(jq -c '{include: [.include[] | select(.stage=="dev")]}' affected.json)"
+          PROD="$(jq -c '{include: [.include[] | select(.stage=="prod")]}' affected.json)"
+          echo "dev=$DEV" >> "$GITHUB_OUTPUT"
+          echo "prod=$PROD" >> "$GITHUB_OUTPUT"
+          { [ "$(printf '%s' "$DEV" | jq '.include | length')" -gt 0 ] && echo "has_dev=true" || echo "has_dev=false"; } >> "$GITHUB_OUTPUT"
+          { [ "$(printf '%s' "$PROD" | jq '.include | length')" -gt 0 ] && echo "has_prod=true" || echo "has_prod=false"; } >> "$GITHUB_OUTPUT"
+
+  apply-dev:
+    needs: load
+    if: needs.load.outputs.has_dev == 'true'
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.load.outputs.dev) }}
+    runs-on: ubuntu-latest
     environment: dev
+    env:
+      CLOUD: ${{ matrix.cloud }}
+      STAGE: ${{ matrix.stage }}
     steps:
       - uses: actions/checkout@v6
         with:
@@ -41,10 +81,48 @@ jobs:
           tg_version: ${{ env.TG_VERSION }}
           tofu_version: ${{ env.TOFU_VERSION }}
           tg_command: --version
-      - uses: azure/login@v3
+      - name: Azure login (OIDC)
+        if: matrix.cloud == 'azure'
+        uses: azure/login@v3
         with:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-      - name: Apply (all stacks)
+      - name: Apply dev (all stacks)
+        run: make apply-all
+
+  apply-prod:
+    needs: [load, apply-dev]
+    if: >
+      always() &&
+      needs.load.outputs.has_prod == 'true' &&
+      (needs.apply-dev.result == 'success' || needs.apply-dev.result == 'skipped')
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.load.outputs.prod) }}
+    runs-on: ubuntu-latest
+    environment: prod
+    env:
+      CLOUD: ${{ matrix.cloud }}
+      STAGE: ${{ matrix.stage }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.ref }}
+      - uses: opentofu/setup-opentofu@v2
+        with:
+          tofu_version: ${{ env.TOFU_VERSION }}
+      - uses: gruntwork-io/terragrunt-action@v3
+        with:
+          tg_version: ${{ env.TG_VERSION }}
+          tofu_version: ${{ env.TOFU_VERSION }}
+          tg_command: --version
+      - name: Azure login (OIDC)
+        if: matrix.cloud == 'azure'
+        uses: azure/login@v3
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      - name: Apply prod (all stacks)
         run: make apply-all

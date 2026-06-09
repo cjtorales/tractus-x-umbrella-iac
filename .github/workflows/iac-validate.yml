@@ -16,7 +16,6 @@ permissions:
   contents: read
 
 env:
-  TG_DIR: iac/live/azure/dev
   TOFU_VERSION: 1.9.0
   TG_VERSION: 0.69.0
   TFLINT_VERSION: v0.52.0
@@ -26,8 +25,46 @@ env:
   ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
 
 jobs:
-  validate:
+  detect:
     runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.d.outputs.matrix }}
+      has_changes: ${{ steps.d.outputs.has }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - id: d
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            BASE="${{ github.event.pull_request.base.sha }}"; HEAD="${{ github.sha }}"
+          elif [ "${{ github.event_name }}" = "push" ]; then
+            BASE="${{ github.event.before }}"; HEAD="${{ github.sha }}"
+            git cat-file -e "${BASE}^{commit}" 2>/dev/null || BASE=""
+          else
+            BASE=""; HEAD=""
+          fi
+          MATRIX="$(bash .github/scripts/affected.sh "$BASE" "$HEAD")"
+          echo "matrix=$MATRIX" >> "$GITHUB_OUTPUT"
+          LEN="$(printf '%s' "$MATRIX" | jq '.include | length')"
+          { [ "$LEN" -gt 0 ] && echo "has=true" || echo "has=false"; } >> "$GITHUB_OUTPUT"
+          printf '%s' "$MATRIX" > affected.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: affected
+          path: affected.json
+          retention-days: 1
+
+  validate:
+    needs: detect
+    if: needs.detect.outputs.has_changes == 'true'
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.detect.outputs.matrix) }}
+    runs-on: ubuntu-latest
+    env:
+      CLOUD: ${{ matrix.cloud }}
+      STAGE: ${{ matrix.stage }}
     steps:
       - uses: actions/checkout@v6
       - uses: opentofu/setup-opentofu@v2
@@ -41,7 +78,9 @@ jobs:
       - uses: terraform-linters/setup-tflint@v6
         with:
           tflint_version: ${{ env.TFLINT_VERSION }}
-      - uses: azure/login@v3
+      - name: Azure login (OIDC)
+        if: matrix.cloud == 'azure'
+        uses: azure/login@v3
         with:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
@@ -66,8 +105,15 @@ jobs:
         run: make validate-all
 
   test:
-    needs: validate
+    needs: [detect, validate]
+    if: needs.detect.outputs.has_changes == 'true'
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.detect.outputs.matrix) }}
     runs-on: ubuntu-latest
+    env:
+      CLOUD: ${{ matrix.cloud }}
+      STAGE: ${{ matrix.stage }}
     steps:
       - uses: actions/checkout@v6
       - uses: opentofu/setup-opentofu@v2
@@ -78,7 +124,9 @@ jobs:
           tg_version: ${{ env.TG_VERSION }}
           tofu_version: ${{ env.TOFU_VERSION }}
           tg_command: --version
-      - uses: azure/login@v3
+      - name: Azure login (OIDC)
+        if: matrix.cloud == 'azure'
+        uses: azure/login@v3
         with:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}

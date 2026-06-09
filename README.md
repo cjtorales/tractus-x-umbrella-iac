@@ -71,24 +71,28 @@ If a `plan` shows drift, adjust the **code** to match the live resource before a
 ## CI/CD
 
 Three workflows in `.github/workflows/`, **chained with `workflow_run`** (Azure OIDC login).
-Guaranteed order: **validate → plan → apply**.
+Only the **affected** `cloud/stage` combos run, and apply **promotes dev → prod** with a manual gate:
 
-1. **`iac-validate.yml`** (PR + push main): `validate` job (`make fmt-check` + `make lint` +
-   **Trivy** + **Checkov** + `make validate-all`) and `test` job (`make test-all` — native tests for
-   the 6 modules under `modules/azure/*/tests`). This is the trigger of the chain.
-2. **`iac-plan.yml`**: triggered when `iac-validate` finishes **successfully**. Runs `make plan-all`
-   and, if it came from a PR, **comments the plan on the PR** (sticky comment).
-3. **`iac-apply.yml`**: triggered when `iac-plan` finishes **successfully** and `head_branch == main`.
-   Runs `make apply-all` with `environment: dev` → **waits for approval**.
+```
+PR        → detect → validate → test                              (plan comments on PR)
+push main → detect → validate → test → plan → apply-dev → apply-prod (manual approval)
+```
+
+1. **`iac-validate.yml`**: `detect` (affected combos) → `validate` (`make fmt-check` + `make lint` +
+   **Trivy** + **Checkov** + `make validate-all`) → `test` (`make test-all`).
+2. **`iac-plan.yml`**: runs `make plan-all` for the affected combos; on PRs **comments the plan**.
+3. **`iac-apply.yml`**: `apply-dev` first, then `apply-prod` (`needs: apply-dev`, `environment: prod`
+   → **manual approval**). Only on `main`.
 
 The CI calls the **same `make` targets** used locally (single source of truth); only Trivy and
-Checkov run as dedicated marketplace actions that install their own CLI. The `Makefile` is therefore
-shared between local dev and CI — not local-only.
+Checkov run as dedicated marketplace actions. Full details (affected detection, promotion,
+multi-cloud) in **[`.github/workflows/README.md`](.github/workflows/README.md)**.
 
-> - Apply only proceeds on `main`; on PRs the chain stops at `plan` (comment).
-> - Enable *required reviewers* under **Settings → Environments → dev** so apply asks for approval.
-> - `workflow_run` workflows (`plan`/`apply`) run with the definition from the **default branch**
->   (main): changes to those YAML files only take effect once merged.
+> - Today only `{ cloud: azure, stage: dev }` exists; `prod` / other providers light up automatically
+>   once their `iac/live/<cloud>/<stage>/` stacks are created.
+> - Set up Environments `dev` and `prod` (Settings → Environments); add **required reviewers** to
+>   `prod` for the manual gate.
+> - `workflow_run` workflows run with the definition from the **default branch** (main).
 
 ## Design decisions
 
