@@ -3,8 +3,13 @@ variable "cluster_name" {
   type        = string
 }
 
-variable "location" {
+variable "region" {
   description = "Azure region."
+  type        = string
+}
+
+variable "environment" {
+  description = "Environment name (dev, staging, prod)."
   type        = string
 }
 
@@ -26,6 +31,36 @@ variable "dns_prefix" {
 variable "subnet_id" {
   description = "Subnet ID for AKS nodes."
   type        = string
+}
+
+variable "identity_id" {
+  description = "User-assigned managed identity ID attached to the cluster."
+  type        = string
+}
+
+variable "identity_principal_id" {
+  description = "Principal ID of the user-assigned managed identity (for role assignment)."
+  type        = string
+}
+
+variable "machine_type" {
+  description = "VM size for the system node pool."
+  type        = string
+}
+
+variable "node_count_system" {
+  description = "Number of nodes in the system node pool."
+  type        = number
+}
+
+variable "workloads_machine_type" {
+  description = "VM size for the workloads node pool."
+  type        = string
+}
+
+variable "node_count_workloads" {
+  description = "Initial/min number of nodes in the workloads node pool."
+  type        = number
 }
 
 variable "tags" {

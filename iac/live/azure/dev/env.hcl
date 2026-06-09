@@ -1,9 +1,10 @@
 locals {
   environment = "dev"
   project     = "tx-umbrella"
-  location    = "germanywestcentral"
+  region      = "westeurope"
 
-  # Remote backend placeholders. Update these values once the state storage exists.
+  resource_group_name = "tx-umbrella"
+
   state_resource_group_name  = "tx-umbrella"
   state_storage_account_name = "sttxumbrelladevtfstate"
   state_container_name       = "tfstate"
@@ -14,4 +15,10 @@ locals {
   kubernetes_version  = "1.30"
   address_space       = ["10.10.0.0/16"]
   aks_subnet_prefixes = ["10.10.1.0/24"]
+
+  # Node pools (doc 04)
+  system_vm_size       = "Standard_D2s_v3"
+  node_count_system    = 2
+  workloads_vm_size    = "Standard_D4s_v3"
+  node_count_workloads = 2
 }

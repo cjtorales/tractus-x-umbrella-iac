@@ -1,0 +1,87 @@
+name: iac-validate
+
+on:
+  pull_request:
+    paths:
+      - "iac/**"
+      - ".github/workflows/iac-validate.yml"
+  push:
+    branches: [main]
+    paths:
+      - "iac/**"
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  TG_DIR: iac/live/azure/dev
+  TOFU_VERSION: 1.9.0
+  TG_VERSION: 0.69.0
+  TFLINT_VERSION: v0.52.0
+  ARM_USE_OIDC: "true"
+  ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+  ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+  ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: opentofu/setup-opentofu@v1
+        with:
+          tofu_version: ${{ env.TOFU_VERSION }}
+      - uses: gruntwork-io/terragrunt-action@v2
+        with:
+          tg_version: ${{ env.TG_VERSION }}
+          tofu_version: ${{ env.TOFU_VERSION }}
+          tg_command: --version
+      - uses: terraform-linters/setup-tflint@v4
+        with:
+          tflint_version: ${{ env.TFLINT_VERSION }}
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      - name: Format check
+        run: make fmt-check
+      - name: TFLint
+        run: make lint
+      - name: Trivy (IaC misconfig)
+        uses: aquasecurity/trivy-action@0.24.0
+        with:
+          scan-type: config
+          scan-ref: iac/
+          severity: HIGH,CRITICAL
+          exit-code: "1"
+      - name: Checkov (compliance)
+        uses: bridgecrewio/checkov-action@v12
+        with:
+          directory: iac/
+          framework: terraform
+      - name: Validate (all stacks)
+        run: make validate-all
+
+  test:
+    needs: validate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: opentofu/setup-opentofu@v1
+        with:
+          tofu_version: ${{ env.TOFU_VERSION }}
+      - uses: gruntwork-io/terragrunt-action@v2
+        with:
+          tg_version: ${{ env.TG_VERSION }}
+          tofu_version: ${{ env.TOFU_VERSION }}
+          tg_command: --version
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      - name: Test (all modules)
+        run: make test-all

@@ -1,8 +1,22 @@
+terraform_binary = "tofu"
+
 locals {
   env_config = read_terragrunt_config(find_in_parent_folders("env.hcl"))
   env        = local.env_config.locals.environment
-  location   = local.env_config.locals.location
+  region     = local.env_config.locals.region
   project    = local.env_config.locals.project
+}
+
+terraform {
+  before_hook "validate" {
+    commands = ["apply"]
+    execute  = ["tofu", "validate"]
+  }
+
+  after_hook "test" {
+    commands = ["apply"]
+    execute  = ["tofu", "test"]
+  }
 }
 
 remote_state {
@@ -32,7 +46,8 @@ EOF
 }
 
 inputs = {
-  location = local.location
+  region      = local.region
+  environment = local.env
   tags = {
     environment = local.env
     managed-by  = "terragrunt"

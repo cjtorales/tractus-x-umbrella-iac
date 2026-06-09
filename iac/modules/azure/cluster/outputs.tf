@@ -18,6 +18,24 @@ output "cluster_fqdn" {
   value       = azurerm_kubernetes_cluster.this.fqdn
 }
 
+output "cluster_endpoint" {
+  description = "AKS API server endpoint (host)."
+  value       = azurerm_kubernetes_cluster.this.kube_config[0].host
+  sensitive   = true
+}
+
+output "ca_certificate" {
+  description = "Cluster CA certificate."
+  value       = azurerm_kubernetes_cluster.this.kube_config[0].cluster_ca_certificate
+  sensitive   = true
+}
+
+output "kube_config_raw" {
+  description = "Raw kubeconfig for the cluster."
+  value       = azurerm_kubernetes_cluster.this.kube_config_raw
+  sensitive   = true
+}
+
 output "node_resource_group" {
   description = "Auto-generated node resource group for AKS."
   value       = azurerm_kubernetes_cluster.this.node_resource_group

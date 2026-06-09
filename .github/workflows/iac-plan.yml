@@ -1,0 +1,68 @@
+name: iac-plan
+
+# Chained: runs when iac-validate completes successfully.
+on:
+  workflow_run:
+    workflows: ["iac-validate"]
+    types: [completed]
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+  pull-requests: write
+
+env:
+  TG_DIR: iac/live/azure/dev
+  TOFU_VERSION: 1.9.0
+  TG_VERSION: 0.69.0
+  ARM_USE_OIDC: "true"
+  ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+  ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+  ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+
+jobs:
+  plan:
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.ref }}
+      - uses: opentofu/setup-opentofu@v1
+        with:
+          tofu_version: ${{ env.TOFU_VERSION }}
+      - uses: gruntwork-io/terragrunt-action@v2
+        with:
+          tg_version: ${{ env.TG_VERSION }}
+          tofu_version: ${{ env.TOFU_VERSION }}
+          tg_command: --version
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      - name: Plan (all stacks)
+        id: plan
+        run: |
+          set -o pipefail
+          make plan-all 2>&1 | tee plan_raw.txt
+      - name: Build PR comment
+        if: ${{ github.event.workflow_run.event == 'pull_request' }}
+        run: |
+          {
+            echo '## OpenTofu plan (`run-all`)'
+            echo '<details><summary>Show plan</summary>'
+            echo
+            echo '```'
+            tail -c 60000 plan_raw.txt
+            echo '```'
+            echo '</details>'
+          } > plan_comment.md
+      - name: Comment plan on PR
+        if: ${{ github.event.workflow_run.event == 'pull_request' }}
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          header: tofu-plan
+          number: ${{ github.event.workflow_run.pull_requests[0].number }}
+          path: plan_comment.md
