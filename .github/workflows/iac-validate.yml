@@ -94,6 +94,7 @@ jobs:
         with:
           directory: iac/
           framework: terraform
+          config_file: .checkov.yaml
       - name: Validate (all stacks)
         run: make validate-all
 

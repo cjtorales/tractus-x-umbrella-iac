@@ -1,0 +1,30 @@
+# Checkov config — accepted findings for the dev / exploration scope.
+# doc 04: "exhaustive hardening — minimum for demo/validation". Re-evaluate before prod.
+# These either incur cost (paid SKU, GRS, CMK), require extra infra (Log Analytics,
+# private endpoints, disk encryption set), or would block CI access to the AKS API
+# server / tfstate (private cluster, authorized IPs, default-deny, disabled shared key).
+skip-check:
+  # --- AKS (cluster + node pool) ---
+  - CKV_AZURE_4    # Azure Monitor logging (needs a Log Analytics workspace)
+  - CKV_AZURE_6    # API server authorized IP ranges (blocks CI/kubectl from dynamic IPs)
+  - CKV_AZURE_115  # private cluster (needs private connectivity; blocks CI)
+  - CKV_AZURE_116  # Azure Policy add-on
+  - CKV_AZURE_117  # disk encryption set (CMK)
+  - CKV_AZURE_141  # local admin disabled (needs AAD RBAC integration)
+  - CKV_AZURE_168  # minimum 50 pods per node
+  - CKV_AZURE_170  # paid SKU SLA (cost; doc 04 uses the Free tier)
+  - CKV_AZURE_171  # automatic upgrade channel
+  - CKV_AZURE_172  # Secret Store CSI driver autorotation
+  - CKV_AZURE_226  # ephemeral OS disks
+  - CKV_AZURE_227  # host encryption (needs a subscription feature)
+  - CKV_AZURE_232  # only critical system pods on system nodes
+  # --- state Storage Account / container ---
+  - CKV_AZURE_33   # queue service logging
+  - CKV_AZURE_59   # disallow public access (would block CI access to the tfstate)
+  - CKV_AZURE_206  # geo-replication (cost; LRS chosen deliberately)
+  - CKV2_AZURE_1   # customer-managed key encryption
+  - CKV2_AZURE_21  # blob read logging
+  - CKV2_AZURE_33  # private endpoint (blocks CI)
+  - CKV2_AZURE_38  # soft-delete
+  - CKV2_AZURE_40  # disable shared key auth (would break the azurerm state backend)
+  - CKV2_AZURE_41  # SAS expiration policy

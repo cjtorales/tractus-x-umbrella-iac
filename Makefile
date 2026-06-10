@@ -94,4 +94,4 @@ trivy:  ## Trivy IaC scan (HIGH/CRITICAL)
 	@trivy config iac/ --severity HIGH,CRITICAL --exit-code 1
 
 checkov:  ## Checkov compliance scan
-	@checkov -d iac/ --framework terraform --compact
+	@checkov -d iac/ --framework terraform --compact --config-file .checkov.yaml
