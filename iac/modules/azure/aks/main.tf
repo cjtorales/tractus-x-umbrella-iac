@@ -1,8 +1,24 @@
+module "rg_name" {
+  source        = "../label"
+  resource_type = "azurerm_resource_group"
+  app_name      = var.app_name
+  stage         = var.stage
+  location      = var.region
+}
+
+module "name" {
+  source        = "../label"
+  resource_type = "azurerm_kubernetes_cluster"
+  app_name      = var.app_name
+  stage         = var.stage
+  location      = var.region
+}
+
 resource "azurerm_kubernetes_cluster" "this" {
-  name                = var.cluster_name
+  name                = module.name.resource_name
   location            = var.region
-  resource_group_name = var.resource_group_name
-  dns_prefix          = var.dns_prefix
+  resource_group_name = module.rg_name.resource_name
+  dns_prefix          = module.name.resource_name
   kubernetes_version  = var.kubernetes_version
   tags                = var.tags
 

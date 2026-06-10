@@ -3,8 +3,13 @@ variable "region" {
   type        = string
 }
 
-variable "resource_group_name" {
-  description = "Resource group name."
+variable "app_name" {
+  description = "Application / project name (used for resource naming)."
+  type        = string
+}
+
+variable "stage" {
+  description = "Deployment stage (dev, staging, prod)."
   type        = string
 }
 

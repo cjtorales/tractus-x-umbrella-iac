@@ -5,20 +5,18 @@
 CLOUD ?= $(CLOUD)
 # Stage (dev | prod)
 STAGE ?= $(STAGE)
-# Deployment unit (resource-group | remote-state | networking | identity | dns | cluster)
+# Deployment unit (networking | identity | dns | aks)
 UNIT  ?= $(DEPLOYMENT_UNIT)
 
 LIVE_DIR := iac/live/$(CLOUD)/$(STAGE)
 WORK_DIR := $(LIVE_DIR)/$(UNIT)
 
+# Backend bootstrap lives outside live/ (created once via `make bootstrap`).
+BOOTSTRAP_DIR := iac/bootstrap/$(CLOUD)/$(STAGE)
+
 TG := terragrunt
 TF := tofu                     # terraform_binary = "tofu" in the terragrunt.hcl files
 TGI := --terragrunt-non-interactive
-
-# Bootstrap stacks (RG + state storage) use a local backend and are created once
-# via `make bootstrap`. CI lifecycle commands exclude them and target only the app
-# stacks against the already-existing remote backend.
-EXCLUDE_BOOTSTRAP := --terragrunt-exclude-dir "**/resource-group" --terragrunt-exclude-dir "**/remote-state"
 
 ARM_SUBSCRIPTION_ID ?=${ARM_SUBSCRIPTION_ID}
 ARM_TENANT_ID       ?=${ARM_TENANT_ID}
@@ -30,7 +28,7 @@ ARM_CLIENT_SECRET   ?=${ARM_CLIENT_SECRET}
         fmt fmt-check lint \
         plan apply destroy output \
         validate-all test-all plan-all apply-all destroy-all \
-        import verify-import trivy checkov
+        trivy checkov
 
 help:  ## List available targets
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) \
@@ -39,11 +37,16 @@ help:  ## List available targets
 tools:  ## Show tofu / terragrunt / tflint versions
 	@$(TF) version | head -1; $(TG) --version | head -1; tflint --version | head -1
 
-check-env:  ## Require ARM_SUBSCRIPTION_ID
-	@test -n "$(ARM_SUBSCRIPTION_ID)" || { echo "ERROR: export ARM_SUBSCRIPTION_ID"; exit 1; }
+check-env:  ## Require Azure credentials (all ARM_* vars)
+	@missing=""; \
+	for v in ARM_CLIENT_ID ARM_CLIENT_SECRET ARM_TENANT_ID ARM_SUBSCRIPTION_ID; do \
+		eval "val=\$$$$v"; \
+		[ -n "$$val" ] || missing="$$missing $$v"; \
+	done; \
+	if [ -n "$$missing" ]; then echo "ERROR: missing env vars:$$missing"; exit 1; fi
 
 require-unit:
-	@test -n "$(UNIT)" || { echo "ERROR: set UNIT=<resource-group|remote-state|networking|identity|dns|cluster>"; exit 1; }
+	@test -n "$(UNIT)" || { echo "ERROR: set UNIT=<networking|identity|dns|aks>"; exit 1; }
 
 az-login:  ## Login with a Service Principal
 	@az login --service-principal -u "$(ARM_CLIENT_ID)" -p "$(ARM_CLIENT_SECRET)" --tenant "$(ARM_TENANT_ID)" >/dev/null
@@ -75,29 +78,24 @@ output: require-unit  ## outputs of a single UNIT
 validate-all: check-env  ## run-all validate (skips backend; static check)
 	@TG_DISABLE_BACKEND=true $(TG) run-all validate $(TGI) --terragrunt-working-dir $(LIVE_DIR)
 
-test-all: check-env  ## run-all test (native module tests; skips backend)
-	@TG_DISABLE_BACKEND=true $(TG) run-all test $(TGI) --terragrunt-working-dir $(LIVE_DIR)
+test-all:  ## Native tofu tests for every module that has a tests/ folder
+	@for d in iac/modules/$(CLOUD)/*/; do \
+		[ -d "$${d}tests" ] || continue; \
+		echo "== test $${d} =="; \
+		( cd "$$d" && $(TF) init -backend=false -input=false -no-color >/dev/null && $(TF) test -no-color ) || exit 1; \
+	done
 
 bootstrap: check-env  ## One-time: create RG + state storage (run locally; local state)
-	@$(TG) apply $(TGI) --terragrunt-working-dir $(LIVE_DIR)/resource-group
-	@$(TG) apply $(TGI) --terragrunt-working-dir $(LIVE_DIR)/remote-state
+	@$(TG) apply $(TGI) --terragrunt-working-dir $(BOOTSTRAP_DIR)
 
-plan-all: check-env  ## run-all plan (app stacks; bootstrap excluded)
-	@$(TG) run-all plan $(TGI) $(EXCLUDE_BOOTSTRAP) --terragrunt-working-dir $(LIVE_DIR)
+plan-all: check-env  ## run-all plan (app stacks)
+	@$(TG) run-all plan $(TGI) --terragrunt-working-dir $(LIVE_DIR)
 
-apply-all: check-env  ## run-all apply (app stacks; bootstrap excluded)
-	@$(TG) run-all apply $(TGI) $(EXCLUDE_BOOTSTRAP) --terragrunt-working-dir $(LIVE_DIR)
+apply-all: check-env  ## run-all apply (app stacks)
+	@$(TG) run-all apply $(TGI) --terragrunt-working-dir $(LIVE_DIR)
 
-destroy-all: check-env  ## run-all destroy (app stacks; bootstrap excluded)
-	@$(TG) run-all destroy $(TGI) $(EXCLUDE_BOOTSTRAP) --terragrunt-working-dir $(LIVE_DIR)
-
-import: check-env  ## Import live resources (bootstrap first, then app stacks)
-	@TG_ENABLE_IMPORT=true $(TG) apply $(TGI) --terragrunt-working-dir $(LIVE_DIR)/resource-group
-	@TG_ENABLE_IMPORT=true $(TG) apply $(TGI) --terragrunt-working-dir $(LIVE_DIR)/remote-state
-	@TG_ENABLE_IMPORT=true $(TG) run-all apply $(TGI) $(EXCLUDE_BOOTSTRAP) --terragrunt-working-dir $(LIVE_DIR)
-
-verify-import: check-env  ## Post-import idempotency check (expects "No changes")
-	@$(TG) run-all plan $(TGI) $(EXCLUDE_BOOTSTRAP) --terragrunt-working-dir $(LIVE_DIR)
+destroy-all: check-env  ## run-all destroy (app stacks)
+	@$(TG) run-all destroy $(TGI) --terragrunt-working-dir $(LIVE_DIR)
 
 trivy:  ## Trivy IaC scan (HIGH/CRITICAL)
 	@trivy config iac/ --severity HIGH,CRITICAL --exit-code 1

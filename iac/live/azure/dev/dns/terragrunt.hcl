@@ -4,33 +4,12 @@ include "root" {
 
 locals {
   env_config = read_terragrunt_config(find_in_parent_folders("env.hcl"))
-
-  enable_import   = get_env("TG_ENABLE_IMPORT", "false")
-  subscription_id = get_env("ARM_SUBSCRIPTION_ID", "")
-  rg              = "tx-umbrella"
-  dns_zone_name   = local.env_config.locals.dns_zone_name
-
-  import_body = <<-EOT
-    import {
-      to = azurerm_private_dns_zone.this
-      id = "/subscriptions/${local.subscription_id}/resourceGroups/${local.rg}/providers/Microsoft.Network/privateDnsZones/${local.dns_zone_name}"
-    }
-  EOT
-
-  import_contents = local.enable_import == "true" ? local.import_body : "# Imports disabled. Set TG_ENABLE_IMPORT=true to render import blocks.\n"
 }
 
 terraform {
-  source = "../../../../modules/azure/dns"
-}
-
-generate "imports" {
-  path      = "imports.tf"
-  if_exists = "overwrite"
-  contents  = local.import_contents
+  source = "../../../../modules/azure//dns"
 }
 
 inputs = {
-  resource_group_name = local.env_config.locals.resource_group_name
-  dns_zone_name       = local.env_config.locals.dns_zone_name
+  dns_zone_name = local.env_config.locals.dns_zone_name
 }

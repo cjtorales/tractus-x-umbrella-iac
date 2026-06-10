@@ -13,14 +13,16 @@ push main → detect → validate → test → plan → apply-dev → apply-prod
 | `iac-validate.yml` | PR + push `main` | `detect` → `validate` → `test` |
 | `iac-plan.yml` | on `iac-validate` success | `load` → `plan` (comments plan on PRs) |
 | `iac-apply.yml` | on `iac-plan` success, `head_branch == main` | `load` → `apply-dev` → `apply-prod` |
+| `iac-bootstrap.yml` | **manual only** (`workflow_dispatch`) | `bootstrap` (creates the state backend) |
 
 The CI calls the **same `make` targets** used locally (single source of truth). Only Trivy and
 Checkov run as dedicated marketplace actions.
 
-> **Bootstrap is out of CI.** The `resource-group` and `remote-state` stacks (RG + state Storage
-> Account, local backend) are created **once, locally**, via `make bootstrap`. The CI lifecycle
-> targets (`plan-all` / `apply-all`) **exclude** them, so the pipeline only manages the app stacks
-> against the already-existing remote backend. See the repo README → *Bootstrap*.
+> **Bootstrap.** The state backend (`iac/bootstrap/<cloud>/<stage>`: RG + storage account + container,
+> local backend) lives **outside `live/`**. Create it **once** with `make bootstrap` locally, or via
+> the **manual** `iac-bootstrap.yml` workflow (`workflow_dispatch`). It is run-once: the local backend
+> state isn't persisted across CI runs, so re-running after the resources exist will fail. The chained
+> CI pipeline only manages the app stacks under `live/`.
 
 ## Affected-only execution
 

@@ -3,19 +3,20 @@ variable "region" {
   type        = string
 }
 
-variable "resource_group_name" {
-  description = "Resource group for the remote state backend."
+variable "app_name" {
+  description = "Application / project name (used for resource naming)."
   type        = string
 }
 
-variable "storage_account_name" {
-  description = "Storage account name for remote state."
+variable "stage" {
+  description = "Deployment stage (dev, staging, prod)."
   type        = string
 }
 
 variable "container_name" {
   description = "Blob container name for remote state."
   type        = string
+  default     = "tfstate"
 }
 
 variable "tags" {

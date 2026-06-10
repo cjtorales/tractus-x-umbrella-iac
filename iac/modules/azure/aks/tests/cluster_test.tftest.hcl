@@ -4,13 +4,12 @@ provider "azurerm" {
 }
 
 variables {
-  cluster_name           = "aks-tx-umbrella-dev"
+  app_name               = "tx-umbrella"
+  stage                  = "dev"
   region                 = "westeurope"
-  resource_group_name    = "tx-umbrella"
   kubernetes_version     = "1.30"
-  dns_prefix             = "tx-umbrella-dev"
-  subnet_id              = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/tx-umbrella/providers/Microsoft.Network/virtualNetworks/vnet-tx-umbrella-dev/subnets/snet-aks-dev"
-  identity_id            = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/tx-umbrella/providers/Microsoft.ManagedIdentity/userAssignedIdentities/id-tx-umbrella-dev"
+  subnet_id              = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/tx-umbrella/providers/Microsoft.Network/virtualNetworks/vnet/subnets/snet"
+  identity_id            = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/tx-umbrella/providers/Microsoft.ManagedIdentity/userAssignedIdentities/uai"
   identity_principal_id  = "11111111-1111-1111-1111-111111111111"
   machine_type           = "Standard_D2s_v3"
   node_count_system      = 2
@@ -22,8 +21,8 @@ run "cluster_config_is_correct" {
   command = plan
 
   assert {
-    condition     = azurerm_kubernetes_cluster.this.name == "aks-tx-umbrella-dev"
-    error_message = "Cluster name does not match"
+    condition     = azurerm_kubernetes_cluster.this.name == "aks-tx-umbrella-dev-we"
+    error_message = "Cluster name does not match the label convention"
   }
 
   assert {

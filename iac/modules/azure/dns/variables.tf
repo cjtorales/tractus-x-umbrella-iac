@@ -1,10 +1,20 @@
-variable "resource_group_name" {
-  description = "Resource group for DNS resources."
+variable "region" {
+  description = "Azure region."
+  type        = string
+}
+
+variable "app_name" {
+  description = "Application / project name (used for resource naming)."
+  type        = string
+}
+
+variable "stage" {
+  description = "Deployment stage (dev, staging, prod)."
   type        = string
 }
 
 variable "dns_zone_name" {
-  description = "Azure DNS zone name."
+  description = "Private DNS zone name (a domain, not name-generated)."
   type        = string
 }
 

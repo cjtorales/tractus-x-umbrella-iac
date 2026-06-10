@@ -43,5 +43,5 @@ output "node_resource_group" {
 
 output "resource_group_name" {
   description = "Cluster resource group name."
-  value       = var.resource_group_name
+  value       = module.rg_name.resource_name
 }

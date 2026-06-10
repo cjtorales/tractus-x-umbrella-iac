@@ -1,25 +1,20 @@
-variable "cluster_name" {
-  description = "AKS cluster name."
-  type        = string
-}
-
 variable "region" {
   description = "Azure region."
   type        = string
 }
 
-variable "resource_group_name" {
-  description = "Resource group for the AKS cluster."
+variable "app_name" {
+  description = "Application / project name (used for resource naming)."
+  type        = string
+}
+
+variable "stage" {
+  description = "Deployment stage (dev, staging, prod)."
   type        = string
 }
 
 variable "kubernetes_version" {
   description = "Kubernetes version for AKS."
-  type        = string
-}
-
-variable "dns_prefix" {
-  description = "DNS prefix for AKS."
   type        = string
 }
 

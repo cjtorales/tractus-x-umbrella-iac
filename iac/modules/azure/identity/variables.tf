@@ -3,13 +3,13 @@ variable "region" {
   type        = string
 }
 
-variable "resource_group_name" {
-  description = "Resource group for identity resources."
+variable "app_name" {
+  description = "Application / project name (used for resource naming)."
   type        = string
 }
 
-variable "identity_name" {
-  description = "Managed identity name."
+variable "stage" {
+  description = "Deployment stage (dev, staging, prod)."
   type        = string
 }
 

@@ -4,8 +4,10 @@ provider "azurerm" {
 }
 
 variables {
-  resource_group_name = "tx-umbrella"
-  dns_zone_name       = "dev.tx-umbrella.example.com"
+  app_name      = "tx-umbrella"
+  stage         = "dev"
+  region        = "westeurope"
+  dns_zone_name = "dev.tx-umbrella.example.com"
 }
 
 run "dns_zone_config" {
@@ -17,7 +19,7 @@ run "dns_zone_config" {
   }
 
   assert {
-    condition     = azurerm_private_dns_zone.this.resource_group_name == "tx-umbrella"
-    error_message = "DNS zone resource group does not match"
+    condition     = azurerm_private_dns_zone.this.resource_group_name == "rg-tx-umbrella-dev-we"
+    error_message = "DNS zone resource group does not match the label convention"
   }
 }

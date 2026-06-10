@@ -4,17 +4,17 @@ provider "azurerm" {
 }
 
 variables {
-  region              = "westeurope"
-  resource_group_name = "tx-umbrella"
-  identity_name       = "id-tx-umbrella-dev"
+  app_name = "tx-umbrella"
+  stage    = "dev"
+  region   = "westeurope"
 }
 
 run "identity_config" {
   command = plan
 
   assert {
-    condition     = azurerm_user_assigned_identity.this.name == "id-tx-umbrella-dev"
-    error_message = "Identity name does not match"
+    condition     = azurerm_user_assigned_identity.this.name == "uai-tx-umbrella-dev-we"
+    error_message = "Identity name does not match the label convention"
   }
 
   assert {
@@ -23,7 +23,7 @@ run "identity_config" {
   }
 
   assert {
-    condition     = azurerm_user_assigned_identity.this.resource_group_name == "tx-umbrella"
-    error_message = "Identity resource group does not match"
+    condition     = azurerm_user_assigned_identity.this.resource_group_name == "rg-tx-umbrella-dev-we"
+    error_message = "Identity resource group does not match the label convention"
   }
 }

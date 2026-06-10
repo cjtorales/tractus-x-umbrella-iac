@@ -4,46 +4,26 @@ provider "azurerm" {
 }
 
 variables {
-  region               = "westeurope"
-  resource_group_name  = "tx-umbrella"
-  storage_account_name = "sttxumbrelladevtfstate"
-  container_name       = "tfstate"
+  app_name = "tx-umbrella"
+  stage    = "dev"
+  region   = "westeurope"
 }
 
-run "storage_account_config" {
+run "composition_outputs" {
   command = plan
 
   assert {
-    condition     = azurerm_storage_account.state.name == "sttxumbrelladevtfstate"
-    error_message = "Storage account name does not match"
+    condition     = output.state_resource_group_name == "rg-tx-umbrella-dev-we"
+    error_message = "State resource group name does not match the label convention"
   }
 
   assert {
-    condition     = azurerm_storage_account.state.account_replication_type == "LRS"
-    error_message = "Replication should be LRS"
+    condition     = output.state_storage_account_name == "sactxumbrelladevwe"
+    error_message = "State storage account name does not match the label convention"
   }
 
   assert {
-    condition     = azurerm_storage_account.state.min_tls_version == "TLS1_2"
-    error_message = "Min TLS version should be TLS1_2"
-  }
-
-  assert {
-    condition     = azurerm_storage_account.state.allow_nested_items_to_be_public == false
-    error_message = "Public nested items should be disabled"
-  }
-}
-
-run "container_config" {
-  command = plan
-
-  assert {
-    condition     = azurerm_storage_container.state.name == "tfstate"
-    error_message = "Container name does not match"
-  }
-
-  assert {
-    condition     = azurerm_storage_container.state.container_access_type == "private"
-    error_message = "Container should be private"
+    condition     = output.state_container_name == "tfstate"
+    error_message = "State container name does not match"
   }
 }

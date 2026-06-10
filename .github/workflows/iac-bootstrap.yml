@@ -1,0 +1,49 @@
+name: iac-bootstrap
+
+# Manual only. Creates the state backend (resource group + storage account + container)
+# for a cloud/stage. Run ONCE per stage: the bootstrap uses a local backend, so its
+# state is not persisted across runs — re-running after the resources exist will fail.
+on:
+  workflow_dispatch:
+    inputs:
+      cloud:
+        description: Cloud provider
+        type: choice
+        options: [azure]
+        default: azure
+      stage:
+        description: Stage
+        type: choice
+        options: [dev]
+        default: dev
+
+permissions:
+  contents: read
+
+env:
+  TOFU_VERSION: 1.10.1
+  TG_VERSION: 0.82.3
+  ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+  ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+  ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+  ARM_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+
+jobs:
+  bootstrap:
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.stage }}
+    env:
+      CLOUD: ${{ inputs.cloud }}
+      STAGE: ${{ inputs.stage }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: opentofu/setup-opentofu@v2
+        with:
+          tofu_version: ${{ env.TOFU_VERSION }}
+      - uses: gruntwork-io/terragrunt-action@v3
+        with:
+          tg_version: ${{ env.TG_VERSION }}
+          tofu_version: ${{ env.TOFU_VERSION }}
+          tg_command: --version
+      - name: Bootstrap state backend
+        run: make bootstrap
