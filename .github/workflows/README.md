@@ -38,43 +38,39 @@ skipped.
 
 ## Repo settings required
 
-### 1. Secrets (Settings → Secrets and variables → Actions)
+Auth is **service-principal + client secret**: the `azurerm` provider authenticates directly from the
+`ARM_*` env vars (no `azure/login`, no `az` CLI, no OIDC / federated credentials).
 
-| Secret | Purpose |
-|---|---|
-| `AZURE_CLIENT_ID` | App registration (OIDC) |
-| `AZURE_TENANT_ID` | Entra ID tenant |
-| `AZURE_SUBSCRIPTION_ID` | Target subscription |
+### 1. Secrets (Settings → Secrets and variables → Actions — **Repository** secrets)
 
-`GITHUB_TOKEN` is automatic. Add `GCP_*` / `AWS_*` only when those clouds are introduced.
+| Secret | Mapped to env | Purpose |
+|---|---|---|
+| `AZURE_CLIENT_ID` | `ARM_CLIENT_ID` | Service principal app id |
+| `AZURE_TENANT_ID` | `ARM_TENANT_ID` | Entra ID tenant |
+| `AZURE_SUBSCRIPTION_ID` | `ARM_SUBSCRIPTION_ID` | Target subscription |
+| `AZURE_CLIENT_SECRET` | `ARM_CLIENT_SECRET` | Service principal secret |
 
-### 2. Cloud OIDC federation (no client secret)
+Must be **Repository** secrets (not Environment) so `validate` / `test` / `plan` (which have no
+`environment:`) can read them. `GITHUB_TOKEN` is automatic. Add `GCP_*` / `AWS_*` only when those
+clouds are introduced.
 
-Workflows use `ARM_USE_OIDC: true` + `azure/login` with OIDC. On the cloud side:
+The service principal needs the role assignments the stacks require (resource management, role
+assignment for the cluster identity, DNS management) on the target scope.
 
-- An App registration / Service Principal.
-- **Federated credentials** for GitHub, one per subject:
-  - `repo:<org>/<repo>:ref:refs/heads/main`
-  - `repo:<org>/<repo>:pull_request`
-  - `repo:<org>/<repo>:environment:dev`
-  - `repo:<org>/<repo>:environment:prod`
-- The role assignments the stacks need (resource management, role assignment for the cluster identity,
-  DNS management) on the target scope.
-
-### 3. Environments (Settings → Environments)
+### 2. Environments (Settings → Environments)
 
 - `dev` — optional reviewers.
 - `prod` — add **required reviewers** so `apply-prod` waits for **manual approval**. Scope
   per-environment secrets here if dev/prod use different subscriptions.
 
-### 4. Branch protection (on `main`)
+### 3. Branch protection (on `main`)
 
 - Require a pull request before merging.
 - **Required status checks**: `validate`, `test`, `plan`.
   > With the matrix, check names include the combo (e.g. `validate (azure, dev)`).
 - Require branches to be up to date before merging.
 
-### 5. Actions settings (Settings → Actions → General)
+### 4. Actions settings (Settings → Actions → General)
 
 - **Allowed actions**: permit `actions/*`, `opentofu/*`, `gruntwork-io/*`, `terraform-linters/*`,
   `azure/*`, `aquasecurity/*`, `bridgecrewio/*`, `marocchino/*` (or allow all).
