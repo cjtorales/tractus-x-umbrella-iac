@@ -17,6 +17,11 @@ push main → detect → validate → test → plan → apply-dev → apply-prod
 The CI calls the **same `make` targets** used locally (single source of truth). Only Trivy and
 Checkov run as dedicated marketplace actions.
 
+> **Bootstrap is out of CI.** The `resource-group` and `remote-state` stacks (RG + state Storage
+> Account, local backend) are created **once, locally**, via `make bootstrap`. The CI lifecycle
+> targets (`plan-all` / `apply-all`) **exclude** them, so the pipeline only manages the app stacks
+> against the already-existing remote backend. See the repo README → *Bootstrap*.
+
 ## Affected-only execution
 
 `detect` runs [`.github/scripts/affected.sh`](../scripts/affected.sh) which diffs the change set and

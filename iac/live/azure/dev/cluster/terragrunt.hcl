@@ -2,16 +2,6 @@ include "root" {
   path = find_in_parent_folders("terragrunt.hcl")
 }
 
-dependency "resource_group" {
-  config_path = "../resource-group"
-
-  mock_outputs = {
-    resource_group_name = "tx-umbrella"
-  }
-  mock_outputs_allowed_terraform_commands = ["validate", "plan", "test"]
-  skip_outputs                            = get_env("TG_DISABLE_BACKEND", "false") == "true"
-}
-
 dependency "networking" {
   config_path = "../networking"
 
@@ -67,7 +57,7 @@ generate "imports" {
 }
 
 inputs = {
-  resource_group_name   = dependency.resource_group.outputs.resource_group_name
+  resource_group_name   = local.env_config.locals.resource_group_name
   cluster_name          = local.env_config.locals.cluster_name
   kubernetes_version    = local.env_config.locals.kubernetes_version
   dns_prefix            = "tx-umbrella-dev"

@@ -15,13 +15,18 @@ TG := terragrunt
 TF := tofu                     # terraform_binary = "tofu" in the terragrunt.hcl files
 TGI := --terragrunt-non-interactive
 
+# Bootstrap stacks (RG + state storage) use a local backend and are created once
+# via `make bootstrap`. CI lifecycle commands exclude them and target only the app
+# stacks against the already-existing remote backend.
+EXCLUDE_BOOTSTRAP := --terragrunt-exclude-dir "**/resource-group" --terragrunt-exclude-dir "**/remote-state"
+
 ARM_SUBSCRIPTION_ID ?=${ARM_SUBSCRIPTION_ID}
 ARM_TENANT_ID       ?=${ARM_TENANT_ID}
 ARM_CLIENT_ID       ?=${ARM_CLIENT_ID}
 ARM_CLIENT_SECRET   ?=${ARM_CLIENT_SECRET}
 
 .DEFAULT_GOAL := help
-.PHONY: help tools check-env require-unit az-login \
+.PHONY: help tools check-env require-unit az-login bootstrap \
         fmt fmt-check lint \
         plan apply destroy output \
         validate-all test-all plan-all apply-all destroy-all \
@@ -73,22 +78,26 @@ validate-all: check-env  ## run-all validate (skips backend; static check)
 test-all: check-env  ## run-all test (native module tests; skips backend)
 	@TG_DISABLE_BACKEND=true $(TG) run-all test $(TGI) --terragrunt-working-dir $(LIVE_DIR)
 
-plan-all: check-env  ## run-all plan
-	@$(TG) run-all plan $(TGI) --terragrunt-working-dir $(LIVE_DIR)
+bootstrap: check-env  ## One-time: create RG + state storage (run locally; local state)
+	@$(TG) apply $(TGI) --terragrunt-working-dir $(LIVE_DIR)/resource-group
+	@$(TG) apply $(TGI) --terragrunt-working-dir $(LIVE_DIR)/remote-state
 
-apply-all: check-env  ## run-all apply (respects dependencies)
-	@$(TG) run-all apply $(TGI) --terragrunt-working-dir $(LIVE_DIR)
+plan-all: check-env  ## run-all plan (app stacks; bootstrap excluded)
+	@$(TG) run-all plan $(TGI) $(EXCLUDE_BOOTSTRAP) --terragrunt-working-dir $(LIVE_DIR)
 
-destroy-all: check-env  ## run-all destroy
-	@$(TG) run-all destroy $(TGI) --terragrunt-working-dir $(LIVE_DIR)
+apply-all: check-env  ## run-all apply (app stacks; bootstrap excluded)
+	@$(TG) run-all apply $(TGI) $(EXCLUDE_BOOTSTRAP) --terragrunt-working-dir $(LIVE_DIR)
 
-import: check-env  ## Import live resources (RG and remote-state first)
+destroy-all: check-env  ## run-all destroy (app stacks; bootstrap excluded)
+	@$(TG) run-all destroy $(TGI) $(EXCLUDE_BOOTSTRAP) --terragrunt-working-dir $(LIVE_DIR)
+
+import: check-env  ## Import live resources (bootstrap first, then app stacks)
 	@TG_ENABLE_IMPORT=true $(TG) apply $(TGI) --terragrunt-working-dir $(LIVE_DIR)/resource-group
 	@TG_ENABLE_IMPORT=true $(TG) apply $(TGI) --terragrunt-working-dir $(LIVE_DIR)/remote-state
-	@TG_ENABLE_IMPORT=true $(TG) run-all apply $(TGI) --terragrunt-working-dir $(LIVE_DIR)
+	@TG_ENABLE_IMPORT=true $(TG) run-all apply $(TGI) $(EXCLUDE_BOOTSTRAP) --terragrunt-working-dir $(LIVE_DIR)
 
 verify-import: check-env  ## Post-import idempotency check (expects "No changes")
-	@$(TG) run-all plan $(TGI) --terragrunt-working-dir $(LIVE_DIR)
+	@$(TG) run-all plan $(TGI) $(EXCLUDE_BOOTSTRAP) --terragrunt-working-dir $(LIVE_DIR)
 
 trivy:  ## Trivy IaC scan (HIGH/CRITICAL)
 	@trivy config iac/ --severity HIGH,CRITICAL --exit-code 1

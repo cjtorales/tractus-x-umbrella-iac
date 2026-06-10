@@ -1,15 +1,5 @@
 terraform_binary = "tofu"
 
-dependency "resource_group" {
-  config_path = "../resource-group"
-
-  mock_outputs = {
-    resource_group_name = "tx-umbrella"
-  }
-  mock_outputs_allowed_terraform_commands = ["validate", "plan", "test"]
-  skip_outputs                            = get_env("TG_DISABLE_BACKEND", "false") == "true"
-}
-
 locals {
   enable_import   = get_env("TG_ENABLE_IMPORT", "false")
   subscription_id = get_env("ARM_SUBSCRIPTION_ID", "")
@@ -66,7 +56,7 @@ remote_state {
 
 inputs = {
   region               = "westeurope"
-  resource_group_name  = dependency.resource_group.outputs.resource_group_name
+  resource_group_name  = local.rg
   storage_account_name = "sttxumbrelladevtfstate"
   container_name       = "tfstate"
   tags = {

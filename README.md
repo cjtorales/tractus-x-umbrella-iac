@@ -49,14 +49,30 @@ make tools            # prints installed tofu / terragrunt / tflint versions
 export ARM_SUBSCRIPTION_ID="<SUBSCRIPTION_ID>"
 ```
 
+## Bootstrap (one-time)
+
+The `resource-group` and `remote-state` stacks create the resource group and the state Storage
+Account, and use a **local backend**. They are a **one-time, run-locally** step (their local state
+is not persisted in CI). Everything else uses the remote backend they create.
+
+```bash
+export ARM_SUBSCRIPTION_ID="<SUBSCRIPTION_ID>"
+make bootstrap        # apply resource-group + remote-state (once, locally)
+```
+
+After bootstrap, the app stacks (`networking`, `identity`, `dns`, `cluster`) reference the resource
+group **by name** (from `env.hcl`), not via a state dependency — so CI never needs the bootstrap
+state. The CI lifecycle commands (`plan-all` / `apply-all`) **exclude** the bootstrap stacks.
+
 ## Commands (Makefile)
 
 ```bash
 make help                       # list targets
 make fmt-check lint             # formatting + tflint
-make plan-all                   # plan all stacks
+make bootstrap                  # one-time: RG + state storage (local)
+make plan-all                   # plan the app stacks (bootstrap excluded)
 make UNIT=cluster plan          # plan a single stack
-make apply-all                  # apply (ordered by dependencies)
+make apply-all                  # apply the app stacks (bootstrap excluded)
 make trivy checkov              # security + compliance
 ```
 
