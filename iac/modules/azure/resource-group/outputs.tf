@@ -1,14 +1,9 @@
 output "resource_group_name" {
-  description = "Provisioned resource group name."
-  value       = azurerm_resource_group.this.name
+  description = "Resource group name (created or reused)."
+  value       = local.name
 }
 
 output "resource_group_id" {
-  description = "Provisioned resource group ID."
-  value       = azurerm_resource_group.this.id
-}
-
-output "region" {
-  description = "Resource group region."
-  value       = azurerm_resource_group.this.location
+  description = "Resource group ID (null when reusing an existing one)."
+  value       = one(azurerm_resource_group.this[*].id)
 }

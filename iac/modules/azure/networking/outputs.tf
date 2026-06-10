@@ -25,5 +25,5 @@ output "network_security_group_id" {
 
 output "resource_group_name" {
   description = "Networking resource group name."
-  value       = module.rg_name.resource_name
+  value       = local.rg
 }

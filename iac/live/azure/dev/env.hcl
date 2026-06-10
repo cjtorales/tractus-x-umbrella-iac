@@ -3,6 +3,9 @@ locals {
   environment = "dev"
   region      = "germanywestcentral"
 
+  resource_group_name   = "tx-umbrella"
+  create_resource_group = false
+
   dns_zone_name       = "dev.tx-umbrella.com"
   kubernetes_version  = "1.30"
   address_space       = ["10.10.0.0/16"]

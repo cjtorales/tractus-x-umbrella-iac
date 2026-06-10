@@ -20,8 +20,10 @@ locals {
     switzerlandnorth   = "szn"
     swedencentral      = "sdc"
   }
-  geo                  = lookup(local.geo_codes, local.region, "unk")
-  state_rg_name        = "rg-${local.app_name}-${local.stage}-${local.geo}"
+  geo         = lookup(local.geo_codes, local.region, "unk")
+  rg_override = lookup(local.env_config.locals, "resource_group_name", "")
+
+  state_rg_name        = local.rg_override != "" ? local.rg_override : "rg-${local.app_name}-${local.stage}-${local.geo}"
   state_sa_name        = substr(lower("sac${replace(local.app_name, "-", "")}${local.stage}${local.geo}"), 0, 24)
   state_container_name = "tfstate"
 
@@ -74,9 +76,10 @@ EOF
 }
 
 inputs = {
-  region   = local.region
-  app_name = local.app_name
-  stage    = local.stage
+  region              = local.region
+  app_name            = local.app_name
+  stage               = local.stage
+  resource_group_name = local.rg_override
   tags = {
     environment = local.stage
     managed-by  = "terragrunt"

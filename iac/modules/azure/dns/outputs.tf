@@ -10,5 +10,5 @@ output "dns_zone_id" {
 
 output "resource_group_name" {
   description = "DNS resource group name."
-  value       = module.rg_name.resource_name
+  value       = local.rg
 }

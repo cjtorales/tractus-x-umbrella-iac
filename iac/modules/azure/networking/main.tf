@@ -22,10 +22,14 @@ module "subnet_name" {
   location      = var.region
 }
 
+locals {
+  rg = var.resource_group_name != "" ? var.resource_group_name : module.rg_name.resource_name
+}
+
 resource "azurerm_virtual_network" "this" {
   name                = module.vnet_name.resource_name
   location            = var.region
-  resource_group_name = module.rg_name.resource_name
+  resource_group_name = local.rg
   address_space       = var.address_space
   tags                = var.tags
 }
@@ -33,13 +37,13 @@ resource "azurerm_virtual_network" "this" {
 resource "azurerm_network_security_group" "aks" {
   name                = "${module.subnet_name.resource_name}-nsg"
   location            = var.region
-  resource_group_name = module.rg_name.resource_name
+  resource_group_name = local.rg
   tags                = var.tags
 }
 
 resource "azurerm_subnet" "aks" {
   name                 = module.subnet_name.resource_name
-  resource_group_name  = module.rg_name.resource_name
+  resource_group_name  = local.rg
   virtual_network_name = azurerm_virtual_network.this.name
   address_prefixes     = var.aks_subnet_prefixes
 }

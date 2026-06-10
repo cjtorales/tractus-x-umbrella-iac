@@ -5,6 +5,8 @@ module "resource_group" {
   app_name = var.app_name
   stage    = var.stage
   region   = var.region
+  create   = var.create_resource_group
+  name     = var.resource_group_name
   tags     = var.tags
 }
 

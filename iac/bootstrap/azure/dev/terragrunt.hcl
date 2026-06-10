@@ -34,9 +34,11 @@ remote_state {
 }
 
 inputs = {
-  region   = local.env_config.locals.region
-  app_name = local.env_config.locals.project
-  stage    = local.env_config.locals.environment
+  region                = local.env_config.locals.region
+  app_name              = local.env_config.locals.project
+  stage                 = local.env_config.locals.environment
+  resource_group_name   = lookup(local.env_config.locals, "resource_group_name", "")
+  create_resource_group = lookup(local.env_config.locals, "create_resource_group", true)
   tags = {
     environment = local.env_config.locals.environment
     managed-by  = "terragrunt"

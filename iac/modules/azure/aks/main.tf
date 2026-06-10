@@ -14,10 +14,14 @@ module "name" {
   location      = var.region
 }
 
+locals {
+  rg = var.resource_group_name != "" ? var.resource_group_name : module.rg_name.resource_name
+}
+
 resource "azurerm_kubernetes_cluster" "this" {
   name                = module.name.resource_name
   location            = var.region
-  resource_group_name = module.rg_name.resource_name
+  resource_group_name = local.rg
   dns_prefix          = module.name.resource_name
   kubernetes_version  = var.kubernetes_version
   tags                = var.tags

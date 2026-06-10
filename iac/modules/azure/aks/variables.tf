@@ -13,6 +13,12 @@ variable "stage" {
   type        = string
 }
 
+variable "resource_group_name" {
+  description = "Existing resource group name. Empty means generate it with the label module."
+  type        = string
+  default     = ""
+}
+
 variable "kubernetes_version" {
   description = "Kubernetes version for AKS."
   type        = string
