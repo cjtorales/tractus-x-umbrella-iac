@@ -1,7 +1,7 @@
 locals {
   environment = "dev"
   project     = "tx-umbrella"
-  region      = "westeurope"
+  region      = "germanywestcentral"
 
   resource_group_name = "tx-umbrella"
 
