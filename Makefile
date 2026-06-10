@@ -67,7 +67,7 @@ plan: require-unit check-env  ## plan a single UNIT
 	@$(TG) plan --terragrunt-working-dir $(WORK_DIR)
 
 apply: require-unit check-env  ## apply a single UNIT
-	@$(TG) apply $(TGI) --terragrunt-working-dir $(WORK_DIR)
+	@$(TG) apply -auto-approve $(TGI) --terragrunt-working-dir $(WORK_DIR)
 
 destroy: require-unit check-env  ## destroy a single UNIT
 	@$(TG) destroy --terragrunt-working-dir $(WORK_DIR)
@@ -86,13 +86,13 @@ test-all:  ## Native tofu tests for every module that has a tests/ folder
 	done
 
 bootstrap: check-env  ## One-time: create RG + state storage (run locally; local state)
-	@$(TG) apply $(TGI) --terragrunt-working-dir $(BOOTSTRAP_DIR)
+	@$(TG) apply -auto-approve $(TGI) --terragrunt-working-dir $(BOOTSTRAP_DIR)
 
 plan-all: check-env  ## run-all plan (app stacks)
 	@$(TG) run-all plan $(TGI) --terragrunt-working-dir $(LIVE_DIR)
 
 apply-all: check-env  ## run-all apply (app stacks)
-	@$(TG) run-all apply $(TGI) --terragrunt-working-dir $(LIVE_DIR)
+	@$(TG) run-all apply -auto-approve $(TGI) --terragrunt-working-dir $(LIVE_DIR)
 
 destroy-all: check-env  ## run-all destroy (app stacks)
 	@$(TG) run-all destroy $(TGI) --terragrunt-working-dir $(LIVE_DIR)
