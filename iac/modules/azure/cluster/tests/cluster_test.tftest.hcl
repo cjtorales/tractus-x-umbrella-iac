@@ -6,7 +6,6 @@ provider "azurerm" {
 variables {
   cluster_name           = "aks-tx-umbrella-dev"
   region                 = "westeurope"
-  environment            = "dev"
   resource_group_name    = "tx-umbrella"
   kubernetes_version     = "1.30"
   dns_prefix             = "tx-umbrella-dev"

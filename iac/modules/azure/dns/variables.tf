@@ -1,8 +1,3 @@
-variable "region" {
-  description = "Azure region."
-  type        = string
-}
-
 variable "resource_group_name" {
   description = "Resource group for DNS resources."
   type        = string

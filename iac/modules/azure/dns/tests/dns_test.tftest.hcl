@@ -4,7 +4,6 @@ provider "azurerm" {
 }
 
 variables {
-  region              = "westeurope"
   resource_group_name = "tx-umbrella"
   dns_zone_name       = "dev.tx-umbrella.example.com"
 }

@@ -8,11 +8,6 @@ variable "region" {
   type        = string
 }
 
-variable "environment" {
-  description = "Environment name (dev, staging, prod)."
-  type        = string
-}
-
 variable "resource_group_name" {
   description = "Resource group for the AKS cluster."
   type        = string
