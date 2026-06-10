@@ -88,6 +88,7 @@ jobs:
           scan-ref: iac/
           severity: HIGH,CRITICAL
           exit-code: "1"
+          trivyignores: .trivyignore
       - name: Checkov (compliance)
         uses: bridgecrewio/checkov-action@v12
         with:

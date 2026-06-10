@@ -1,0 +1,12 @@
+# Accepted misconfigurations for the dev / exploration scope.
+# doc 04: "exhaustive hardening — minimum for demo/validation". Re-evaluate before prod.
+
+# AZU-0041: AKS API server is not restricted to specific IP ranges.
+# Restricting by IP (or a private cluster) would block CI/kubectl access from the
+# dynamic IPs of GitHub-hosted runners. Accepted for dev.
+AZU-0041
+
+# AZU-0012: state Storage Account has no network rules (default action allows access).
+# Setting default_action=Deny would block the CI runners from reading/writing the
+# Terraform state. Accepted for dev; harden with private endpoint / IP allowlist for prod.
+AZU-0012
