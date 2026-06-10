@@ -67,11 +67,11 @@ destroy: require-unit check-env  ## destroy a single UNIT
 output: require-unit  ## outputs of a single UNIT
 	@$(TG) output --terragrunt-working-dir $(WORK_DIR)
 
-validate-all: check-env  ## run-all validate
-	@$(TG) run-all validate $(TGI) --terragrunt-working-dir $(LIVE_DIR)
+validate-all: check-env  ## run-all validate (skips backend; static check)
+	@TG_DISABLE_BACKEND=true $(TG) run-all validate $(TGI) --terragrunt-working-dir $(LIVE_DIR)
 
-test-all: check-env  ## run-all test (native module tests)
-	@$(TG) run-all test $(TGI) --terragrunt-working-dir $(LIVE_DIR)
+test-all: check-env  ## run-all test (native module tests; skips backend)
+	@TG_DISABLE_BACKEND=true $(TG) run-all test $(TGI) --terragrunt-working-dir $(LIVE_DIR)
 
 plan-all: check-env  ## run-all plan
 	@$(TG) run-all plan $(TGI) --terragrunt-working-dir $(LIVE_DIR)

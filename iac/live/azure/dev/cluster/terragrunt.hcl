@@ -8,7 +8,8 @@ dependency "resource_group" {
   mock_outputs = {
     resource_group_name = "tx-umbrella"
   }
-  mock_outputs_allowed_terraform_commands = ["validate", "plan"]
+  mock_outputs_allowed_terraform_commands = ["validate", "plan", "test"]
+  skip_outputs                            = get_env("TG_DISABLE_BACKEND", "false") == "true"
 }
 
 dependency "networking" {
@@ -17,7 +18,8 @@ dependency "networking" {
   mock_outputs = {
     aks_subnet_id = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/mock/providers/Microsoft.Network/virtualNetworks/mock/subnets/mock"
   }
-  mock_outputs_allowed_terraform_commands = ["validate", "plan"]
+  mock_outputs_allowed_terraform_commands = ["validate", "plan", "test"]
+  skip_outputs                            = get_env("TG_DISABLE_BACKEND", "false") == "true"
 }
 
 dependency "identity" {
@@ -27,7 +29,8 @@ dependency "identity" {
     identity_id  = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/mock/providers/Microsoft.ManagedIdentity/userAssignedIdentities/mock"
     principal_id = "00000000-0000-0000-0000-000000000000"
   }
-  mock_outputs_allowed_terraform_commands = ["validate", "plan"]
+  mock_outputs_allowed_terraform_commands = ["validate", "plan", "test"]
+  skip_outputs                            = get_env("TG_DISABLE_BACKEND", "false") == "true"
 }
 
 locals {

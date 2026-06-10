@@ -5,9 +5,18 @@ locals {
   env        = local.env_config.locals.environment
   region     = local.env_config.locals.region
   project    = local.env_config.locals.project
+
+  # When TG_DISABLE_BACKEND=true, init skips the azurerm backend so static checks
+  # (validate) work before the state storage account exists.
+  disable_backend = get_env("TG_DISABLE_BACKEND", "false")
 }
 
 terraform {
+  extra_arguments "conditional_backend" {
+    commands  = ["init"]
+    arguments = local.disable_backend == "true" ? ["-backend=false"] : []
+  }
+
   before_hook "validate" {
     commands = ["apply"]
     execute  = ["tofu", "validate"]

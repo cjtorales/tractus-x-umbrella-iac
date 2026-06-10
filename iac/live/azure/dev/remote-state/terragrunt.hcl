@@ -6,7 +6,8 @@ dependency "resource_group" {
   mock_outputs = {
     resource_group_name = "tx-umbrella"
   }
-  mock_outputs_allowed_terraform_commands = ["validate", "plan"]
+  mock_outputs_allowed_terraform_commands = ["validate", "plan", "test"]
+  skip_outputs                            = get_env("TG_DISABLE_BACKEND", "false") == "true"
 }
 
 locals {
