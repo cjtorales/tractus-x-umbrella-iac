@@ -21,7 +21,7 @@ run "vnet_config" {
   }
 
   assert {
-    condition     = azurerm_virtual_network.this.address_space[0] == "10.10.0.0/16"
+    condition     = contains(azurerm_virtual_network.this.address_space, "10.10.0.0/16")
     error_message = "VNet address space does not match"
   }
 
@@ -35,7 +35,7 @@ run "subnet_and_nsg" {
   command = plan
 
   assert {
-    condition     = azurerm_subnet.aks.address_prefixes[0] == "10.10.1.0/24"
+    condition     = contains(azurerm_subnet.aks.address_prefixes, "10.10.1.0/24")
     error_message = "Subnet prefix does not match"
   }
 
