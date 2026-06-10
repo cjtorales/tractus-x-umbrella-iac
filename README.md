@@ -110,14 +110,15 @@ multi-cloud) in **[`.github/workflows/README.md`](.github/workflows/README.md)**
 
 ## Design decisions
 
-- **`terraform_binary = "tofu"`** in the root and in the bootstrap stacks (`resource-group`,
-  `remote-state`) that do not include the root.
-- **Resource Group managed by IaC** (`resource-group` module). Together with `remote-state` it uses a
-  **local** backend (gitignored) to avoid the chicken-and-egg problem: both must exist before the
-  storage account that holds the other stacks' state.
-- **Variable contract** aligned to the doc: `region`, `environment`, `node_count_system`,
-  `node_count_workloads`, `machine_type`.
-- **Identity → cluster**: the cluster consumes the `identity` module's managed identity and is granted
-  the network role on the subnet (CNI requirement).
-- **Terragrunt hooks**: `before_hook` `tofu validate` and `after_hook` `tofu test` on `apply`.
-- **Import gated by `TG_ENABLE_IMPORT`**: `imports.tf` is generated at runtime, not versioned.
+- **`terraform_binary = "tofu"`** in the root and in the bootstrap stack (which does not include the
+  root).
+- **Naming via the `label` module** — every resource name is generated from `project` + `stage` +
+  `region`. The state backend names (RG + Storage Account) are reproduced in the root with the same
+  convention, since the Terragrunt `remote_state` block can't call a Terraform module.
+- **Resource group create-or-reuse**: `create_resource_group` + `resource_group_name` in `env.hcl`
+  let you create a new RG or reuse an existing one (e.g. when the SP only has rights on that RG).
+- **Backend bootstrap outside `live/`** (`iac/bootstrap/`, local backend), run once — see *Bootstrap*.
+- **Identity → AKS**: the cluster consumes the `identity` module's managed identity and is granted the
+  network role on the subnet (CNI requirement).
+- **Tests** run as the CI `test` job (`make test-all`, one `tofu test` per module) — not as apply
+  hooks, to keep module tests isolated from live inputs.

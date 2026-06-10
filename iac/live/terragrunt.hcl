@@ -37,16 +37,6 @@ terraform {
     commands  = ["init"]
     arguments = local.disable_backend == "true" ? ["-backend=false"] : []
   }
-
-  before_hook "validate" {
-    commands = ["apply"]
-    execute  = ["tofu", "validate"]
-  }
-
-  after_hook "test" {
-    commands = ["apply"]
-    execute  = ["tofu", "test"]
-  }
 }
 
 remote_state {
