@@ -7,7 +7,7 @@ locals {
   create_resource_group = false
 
   dns_zone_name       = "dev.tx-umbrella.com"
-  kubernetes_version  = "1.30"
+  kubernetes_version  = "1.36"
   address_space       = ["10.10.0.0/16"]
   aks_subnet_prefixes = ["10.10.1.0/24"]
 
