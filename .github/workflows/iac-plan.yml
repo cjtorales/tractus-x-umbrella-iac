@@ -34,11 +34,20 @@ jobs:
           fetch-depth: 0
       - name: Download affected matrix (from iac-validate run)
         if: ${{ github.event_name == 'workflow_run' }}
-        uses: actions/download-artifact@v4
-        with:
-          name: affected
-          run-id: ${{ github.event.workflow_run.id }}
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # download-artifact@v4 can flake with "Requires authentication" on
+          # cross-run downloads; retry, then let the next step recompute on failure.
+          for i in 1 2 3 4 5; do
+            rm -rf _dl
+            if gh run download "${{ github.event.workflow_run.id }}" -n affected -D _dl; then
+              f="$(find _dl -name affected.json | head -1)"
+              [ -n "$f" ] && cp "$f" affected.json && exit 0
+            fi
+            echo "download attempt $i failed; retrying in 5s"; sleep 5
+          done
+          echo "could not download the affected artifact; the next step will recompute"
       - id: l
         run: |
           if [ ! -f affected.json ]; then
