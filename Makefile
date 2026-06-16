@@ -3,7 +3,7 @@
 
 # Cloud provider (azure | aws | gcp)
 CLOUD ?= $(CLOUD)
-# Stage (dev | prod)
+# Stage (test | dev | prod)
 STAGE ?= $(STAGE)
 # Deployment unit (networking | identity | dns | aks)
 UNIT  ?= $(DEPLOYMENT_UNIT)

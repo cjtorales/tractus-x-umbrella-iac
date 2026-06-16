@@ -10,6 +10,7 @@ override.tf.json
 *_override.tf.json
 .env
 tmp/
+.azure-tmp/
 
 # CI/local plan capture artifacts
 plan_raw.txt

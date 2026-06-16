@@ -1,54 +1,56 @@
 # CI/CD workflows
 
-Three workflows, **chained with `workflow_run`**. Order: **validate → plan → apply**.
-Only the **affected** `cloud/stage` combos run, and apply **promotes dev → prod** with a manual gate.
+Three workflows, **chained with `workflow_run`**. Order: **validate -> plan -> apply**.
+Only the **affected** `cloud/stage` combos run, and apply **promotes test -> dev -> prod**
+with a manual gate.
 
 ```
-PR        → detect → validate → test                    (affected combos; plan comments on PR)
-push main → detect → validate → test → plan → apply-dev → apply-prod (manual approval)
+PR        -> detect -> validate -> test                                 (affected combos; plan comments on PR)
+push main -> detect -> validate -> test -> plan -> apply-test -> apply-dev -> apply-prod (manual approval)
 ```
 
 | Workflow | Trigger | Jobs |
 |---|---|---|
-| `iac-validate.yml` | PR + push `main` | `detect` → `validate` → `test` |
-| `iac-plan.yml` | on `iac-validate` success | `load` → `plan` (comments plan on PRs) |
-| `iac-apply.yml` | on `iac-plan` success, `head_branch == main` | `load` → `apply-dev` → `apply-prod` |
+| `iac-validate.yml` | PR + push `main` | `detect` -> `validate` -> `test` |
+| `iac-plan.yml` | on `iac-validate` success | `load` -> `plan` (comments plan on PRs) |
+| `iac-apply.yml` | on `iac-plan` success, `head_branch == main` | `load` -> `apply-test` -> `apply-dev` -> `apply-prod` |
 | `iac-bootstrap.yml` | **manual only** (`workflow_dispatch`) | `bootstrap` (creates the state backend) |
 
 The CI calls the **same `make` targets** used locally (single source of truth). Only Trivy and
 Checkov run as dedicated marketplace actions.
 
-> **Bootstrap.** The state backend (`iac/bootstrap/<cloud>/<stage>`: RG + storage account + container,
-> local backend) lives **outside `live/`**. Create it **once** with `make bootstrap` locally, or via
-> the **manual** `iac-bootstrap.yml` workflow (`workflow_dispatch`). It is run-once: the local backend
-> state isn't persisted across CI runs, so re-running after the resources exist will fail. The chained
-> CI pipeline only manages the app stacks under `live/`.
+> **Bootstrap.** The state backend (`iac/bootstrap/<cloud>/<stage>`: RG + storage account +
+> container, local backend) lives **outside `live/`**. Create it **once** with `make bootstrap`
+> locally, or via the **manual** `iac-bootstrap.yml` workflow (`workflow_dispatch`). It is run-once:
+> the local backend state is not persisted across CI runs, so re-running after the resources exist
+> will fail. The chained CI pipeline only manages the app stacks under `live/`.
 
 ## Affected-only execution
 
 `detect` runs [`.github/scripts/affected.sh`](../scripts/affected.sh) which diffs the change set and
 emits a matrix of only the impacted combos:
 
-- `iac/live/<cloud>/<stage>/**` changed → that combo.
-- `iac/modules/<cloud>/**` changed → all stages of that cloud.
-- a global file (`iac/live/terragrunt.hcl`, `iac/.tflint.hcl`, `Makefile`, `.github/**`) → all combos.
-- `workflow_dispatch` → all existing combos.
+- `iac/live/<cloud>/<stage>/**` changed -> that combo.
+- `iac/modules/<cloud>/**` changed -> all stages of that cloud.
+- A global file (`iac/live/terragrunt.hcl`, `iac/.tflint.hcl`, `Makefile`, `.github/**`) changed -> all combos.
+- `workflow_dispatch` -> all existing combos.
 
 The matrix is uploaded as the `affected` artifact and consumed downstream across the `workflow_run`
 chain (`actions/download-artifact` with `run-id`). If nothing is affected, downstream jobs are
 skipped.
 
-## Promotion dev → prod
+## Promotion test -> dev -> prod
 
-`apply-dev` runs first; `apply-prod` has `needs: [load, apply-dev]` and only runs after dev
-**succeeded or was skipped** (prod-only change). Prod is gated by `environment: prod`.
+`apply-test` runs first; `apply-dev` only runs after test **succeeded or was skipped**
+(`dev`-only change), and `apply-prod` only runs after dev **succeeded or was skipped**
+(`prod`-only change). Prod is gated by `environment: prod`.
 
 ## Repo settings required
 
 Auth is **service-principal + client secret**: the `azurerm` provider authenticates directly from the
 `ARM_*` env vars (no `azure/login`, no `az` CLI, no OIDC / federated credentials).
 
-### 1. Secrets (Settings → Secrets and variables → Actions — **Repository** secrets)
+### 1. Secrets (Settings -> Secrets and variables -> Actions -> **Repository** secrets)
 
 | Secret | Mapped to env | Purpose |
 |---|---|---|
@@ -64,31 +66,32 @@ clouds are introduced.
 The service principal needs the role assignments the stacks require (resource management, role
 assignment for the cluster identity, DNS management) on the target scope.
 
-### 2. Environments (Settings → Environments)
+### 2. Environments (Settings -> Environments)
 
-- `dev` — optional reviewers.
-- `prod` — add **required reviewers** so `apply-prod` waits for **manual approval**. Scope
+- `test` -> optional reviewers.
+- `dev` -> optional reviewers.
+- `prod` -> add **required reviewers** so `apply-prod` waits for **manual approval**. Scope
   per-environment secrets here if dev/prod use different subscriptions.
 
 ### 3. Branch protection (on `main`)
 
 - Require a pull request before merging.
 - **Required status checks**: `validate`, `test`, `plan`.
-  > With the matrix, check names include the combo (e.g. `validate (azure, dev)`).
+  With the matrix, check names include the combo (e.g. `validate (azure, dev)`).
 - Require branches to be up to date before merging.
 
-### 4. Actions settings (Settings → Actions → General)
+### 4. Actions settings (Settings -> Actions -> General)
 
 - **Allowed actions**: permit `actions/*`, `opentofu/*`, `gruntwork-io/*`, `terraform-linters/*`,
   `azure/*`, `aquasecurity/*`, `bridgecrewio/*`, `marocchino/*` (or allow all).
-- Workflow permissions: default is fine — each workflow declares its own (`id-token: write`,
+- Workflow permissions: default is fine - each workflow declares its own (`id-token: write`,
   `pull-requests: write`, `actions: read`).
 - `workflow_run` workflows run with the definition from the **default branch**: changes to those YAML
   files only take effect once merged.
 
 ## Multi-cloud
 
-The matrix is `cloud × stage` and the `Makefile` derives `LIVE_DIR := iac/live/$(CLOUD)/$(STAGE)`.
+The matrix is `cloud x stage` and the `Makefile` derives `LIVE_DIR := iac/live/$(CLOUD)/$(STAGE)`.
 New combos appear **automatically** once their `iac/live/<cloud>/<stage>/` folder exists (no workflow
 edit needed for new stages of an existing cloud). To add a **new provider**:
 
