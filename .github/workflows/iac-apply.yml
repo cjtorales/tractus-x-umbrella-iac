@@ -1,8 +1,9 @@
 name: iac-apply
 
 # Chained: runs when iac-plan completes successfully on main.
-# Promotion: apply-dev first, then apply-prod (gated by the "prod" environment
-# = required reviewers => manual approval). Only affected cloud/stage combos run.
+# Promotion: apply-test -> apply-dev -> apply-prod (gated by the "prod"
+# environment = required reviewers => manual approval). Only affected
+# cloud/stage combos run.
 on:
   workflow_run:
     workflows: ["iac-plan"]
@@ -29,8 +30,10 @@ jobs:
        github.event.workflow_run.head_branch == 'main')
     runs-on: ubuntu-latest
     outputs:
+      test: ${{ steps.l.outputs.test }}
       dev: ${{ steps.l.outputs.dev }}
       prod: ${{ steps.l.outputs.prod }}
+      has_test: ${{ steps.l.outputs.has_test }}
       has_dev: ${{ steps.l.outputs.has_dev }}
       has_prod: ${{ steps.l.outputs.has_prod }}
     steps:
@@ -59,16 +62,48 @@ jobs:
           if [ ! -f affected.json ]; then
             bash .github/scripts/affected.sh "" "" > affected.json
           fi
+          TEST="$(jq -c '{include: [.include[] | select(.stage=="test")]}' affected.json)"
           DEV="$(jq -c '{include: [.include[] | select(.stage=="dev")]}' affected.json)"
           PROD="$(jq -c '{include: [.include[] | select(.stage=="prod")]}' affected.json)"
+          echo "test=$TEST" >> "$GITHUB_OUTPUT"
           echo "dev=$DEV" >> "$GITHUB_OUTPUT"
           echo "prod=$PROD" >> "$GITHUB_OUTPUT"
+          { [ "$(printf '%s' "$TEST" | jq '.include | length')" -gt 0 ] && echo "has_test=true" || echo "has_test=false"; } >> "$GITHUB_OUTPUT"
           { [ "$(printf '%s' "$DEV" | jq '.include | length')" -gt 0 ] && echo "has_dev=true" || echo "has_dev=false"; } >> "$GITHUB_OUTPUT"
           { [ "$(printf '%s' "$PROD" | jq '.include | length')" -gt 0 ] && echo "has_prod=true" || echo "has_prod=false"; } >> "$GITHUB_OUTPUT"
 
-  apply-dev:
+  apply-test:
     needs: load
-    if: needs.load.outputs.has_dev == 'true'
+    if: needs.load.outputs.has_test == 'true'
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.load.outputs.test) }}
+    runs-on: ubuntu-latest
+    environment: test
+    env:
+      CLOUD: ${{ matrix.cloud }}
+      STAGE: ${{ matrix.stage }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.ref }}
+      - uses: opentofu/setup-opentofu@v2
+        with:
+          tofu_version: ${{ env.TOFU_VERSION }}
+      - uses: gruntwork-io/terragrunt-action@v3
+        with:
+          tg_version: ${{ env.TG_VERSION }}
+          tofu_version: ${{ env.TOFU_VERSION }}
+          tg_command: --version
+      - name: Apply test (all stacks)
+        run: make apply-all
+
+  apply-dev:
+    needs: [load, apply-test]
+    if: >
+      always() &&
+      needs.load.outputs.has_dev == 'true' &&
+      (needs.apply-test.result == 'success' || needs.apply-test.result == 'skipped')
     strategy:
       fail-fast: false
       matrix: ${{ fromJSON(needs.load.outputs.dev) }}
