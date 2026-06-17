@@ -1,9 +1,9 @@
 name: iac-apply
 
 # Chained: runs when iac-plan completes successfully on main.
-# Promotion: apply-test -> apply-dev -> apply-prod (gated by the "prod"
-# environment = required reviewers => manual approval). Only affected
-# cloud/stage combos run.
+# Promotion: apply-dev -> apply-test -> apply-prod. dev applies directly;
+# test and prod are gated by their environments (= required reviewers =>
+# manual approval). Only affected cloud/stage combos run.
 on:
   workflow_run:
     workflows: ["iac-plan"]
@@ -72,38 +72,9 @@ jobs:
           { [ "$(printf '%s' "$DEV" | jq '.include | length')" -gt 0 ] && echo "has_dev=true" || echo "has_dev=false"; } >> "$GITHUB_OUTPUT"
           { [ "$(printf '%s' "$PROD" | jq '.include | length')" -gt 0 ] && echo "has_prod=true" || echo "has_prod=false"; } >> "$GITHUB_OUTPUT"
 
-  apply-test:
-    needs: load
-    if: needs.load.outputs.has_test == 'true'
-    strategy:
-      fail-fast: false
-      matrix: ${{ fromJSON(needs.load.outputs.test) }}
-    runs-on: ubuntu-latest
-    environment: test
-    env:
-      CLOUD: ${{ matrix.cloud }}
-      STAGE: ${{ matrix.stage }}
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          ref: ${{ github.event.workflow_run.head_sha || github.ref }}
-      - uses: opentofu/setup-opentofu@v2
-        with:
-          tofu_version: ${{ env.TOFU_VERSION }}
-      - uses: gruntwork-io/terragrunt-action@v3
-        with:
-          tg_version: ${{ env.TG_VERSION }}
-          tofu_version: ${{ env.TOFU_VERSION }}
-          tg_command: --version
-      - name: Apply test (all stacks)
-        run: make apply-all
-
   apply-dev:
-    needs: [load, apply-test]
-    if: >
-      always() &&
-      needs.load.outputs.has_dev == 'true' &&
-      (needs.apply-test.result == 'success' || needs.apply-test.result == 'skipped')
+    needs: load
+    if: needs.load.outputs.has_dev == 'true'
     strategy:
       fail-fast: false
       matrix: ${{ fromJSON(needs.load.outputs.dev) }}
@@ -127,12 +98,41 @@ jobs:
       - name: Apply dev (all stacks)
         run: make apply-all
 
-  apply-prod:
+  apply-test:
     needs: [load, apply-dev]
     if: >
       always() &&
-      needs.load.outputs.has_prod == 'true' &&
+      needs.load.outputs.has_test == 'true' &&
       (needs.apply-dev.result == 'success' || needs.apply-dev.result == 'skipped')
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.load.outputs.test) }}
+    runs-on: ubuntu-latest
+    environment: test
+    env:
+      CLOUD: ${{ matrix.cloud }}
+      STAGE: ${{ matrix.stage }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.ref }}
+      - uses: opentofu/setup-opentofu@v2
+        with:
+          tofu_version: ${{ env.TOFU_VERSION }}
+      - uses: gruntwork-io/terragrunt-action@v3
+        with:
+          tg_version: ${{ env.TG_VERSION }}
+          tofu_version: ${{ env.TOFU_VERSION }}
+          tg_command: --version
+      - name: Apply test (all stacks)
+        run: make apply-all
+
+  apply-prod:
+    needs: [load, apply-test]
+    if: >
+      always() &&
+      needs.load.outputs.has_prod == 'true' &&
+      (needs.apply-test.result == 'success' || needs.apply-test.result == 'skipped')
     strategy:
       fail-fast: false
       matrix: ${{ fromJSON(needs.load.outputs.prod) }}

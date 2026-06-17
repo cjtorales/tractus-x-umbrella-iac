@@ -14,7 +14,7 @@ on:
       stage:
         description: Stage
         type: choice
-        options: [test,dev]
+        options: [dev,test]
         default: dev
 
 permissions:

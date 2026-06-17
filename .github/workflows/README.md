@@ -1,19 +1,19 @@
 # CI/CD workflows
 
 Three workflows, **chained with `workflow_run`**. Order: **validate -> plan -> apply**.
-Only the **affected** `cloud/stage` combos run, and apply **promotes test -> dev -> prod**
-with a manual gate.
+Only the **affected** `cloud/stage` combos run, and apply **promotes dev -> test -> prod**:
+dev applies directly, test and prod each require manual approval.
 
 ```
 PR        -> detect -> validate -> test                                 (affected combos; plan comments on PR)
-push main -> detect -> validate -> test -> plan -> apply-test -> apply-dev -> apply-prod (manual approval)
+push main -> detect -> validate -> test -> plan -> apply-dev -> apply-test -> apply-prod (test & prod: manual approval)
 ```
 
 | Workflow | Trigger | Jobs |
 |---|---|---|
 | `iac-validate.yml` | PR + push `main` | `detect` -> `validate` -> `test` |
 | `iac-plan.yml` | on `iac-validate` success | `load` -> `plan` (comments plan on PRs) |
-| `iac-apply.yml` | on `iac-plan` success, `head_branch == main` | `load` -> `apply-test` -> `apply-dev` -> `apply-prod` |
+| `iac-apply.yml` | on `iac-plan` success, `head_branch == main` | `load` -> `apply-dev` -> `apply-test` -> `apply-prod` |
 | `iac-bootstrap.yml` | **manual only** (`workflow_dispatch`) | `bootstrap` (creates the state backend) |
 
 The CI calls the **same `make` targets** used locally (single source of truth). Only Trivy and
@@ -39,11 +39,12 @@ The matrix is uploaded as the `affected` artifact and consumed downstream across
 chain (`actions/download-artifact` with `run-id`). If nothing is affected, downstream jobs are
 skipped.
 
-## Promotion test -> dev -> prod
+## Promotion dev -> test -> prod
 
-`apply-test` runs first; `apply-dev` only runs after test **succeeded or was skipped**
-(`dev`-only change), and `apply-prod` only runs after dev **succeeded or was skipped**
-(`prod`-only change). Prod is gated by `environment: prod`.
+`apply-dev` runs first (no approval); `apply-test` only runs after dev **succeeded or was
+skipped** (`test`-only change), and `apply-prod` only runs after test **succeeded or was
+skipped** (`prod`-only change). Test and prod are gated by `environment: test` / `environment:
+prod` (each with required reviewers => manual approval).
 
 ## Repo settings required
 
@@ -68,10 +69,10 @@ assignment for the cluster identity, DNS management) on the target scope.
 
 ### 2. Environments (Settings -> Environments)
 
-- `test` -> optional reviewers.
-- `dev` -> optional reviewers.
+- `dev` -> optional reviewers (applies directly, no gate).
+- `test` -> add **required reviewers** so `apply-test` waits for **manual approval**.
 - `prod` -> add **required reviewers** so `apply-prod` waits for **manual approval**. Scope
-  per-environment secrets here if dev/prod use different subscriptions.
+  per-environment secrets here if dev/test/prod use different subscriptions.
 
 ### 3. Branch protection (on `main`)
 
