@@ -3,7 +3,7 @@ locals {
   environment = "test"
   region      = "germanywestcentral"
 
-  resource_group_name   = "tx-umbrella-test"
+  resource_group_name   = "tx-umbrella"
   create_resource_group = false
 
   dns_zone_name       = "test.tx-umbrella.com"
