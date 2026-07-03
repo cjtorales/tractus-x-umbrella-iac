@@ -16,4 +16,7 @@ locals {
   node_count_system    = 1
   workloads_vm_size    = "Standard_D4s_v3"
   node_count_workloads = 1
+
+  # AKS control plane
+  sku_tier = "Free" # Free = no SLA, Standard = SLA-backed control plane
 }

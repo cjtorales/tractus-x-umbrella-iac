@@ -64,3 +64,14 @@ variable "tags" {
   type        = map(string)
   default     = {}
 }
+
+variable "sku_tier" {
+  description = "AKS control plane SKU tier (Free = no SLA, Standard = SLA-backed control plane)."
+  type        = string
+  default     = "Free"
+
+  validation {
+    condition     = contains(["Free", "Standard", "Premium"], var.sku_tier)
+    error_message = "sku_tier must be one of: Free, Standard, Premium."
+  }
+}

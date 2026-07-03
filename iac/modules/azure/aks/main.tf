@@ -44,8 +44,9 @@ resource "azurerm_kubernetes_cluster" "this" {
   }
 
   role_based_access_control_enabled = true
+  oidc_issuer_enabled               = true
 
-  sku_tier = "Free"
+  sku_tier = var.sku_tier
 }
 
 resource "azurerm_role_assignment" "aks_network" {

@@ -40,4 +40,5 @@ inputs = {
   node_count_system      = local.env_config.locals.node_count_system
   workloads_machine_type = local.env_config.locals.workloads_vm_size
   node_count_workloads   = local.env_config.locals.node_count_workloads
+  sku_tier               = local.env_config.locals.sku_tier
 }

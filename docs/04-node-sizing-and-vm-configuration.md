@@ -101,7 +101,8 @@ iac/live/azure/<stage>/env.hcl              <- values to edit (per stage)
   ├── system_vm_size          -> module var "machine_type"
   ├── node_count_system       -> module var "node_count_system"
   ├── workloads_vm_size       -> module var "workloads_machine_type"
-  └── node_count_workloads    -> module var "node_count_workloads"
+  ├── node_count_workloads    -> module var "node_count_workloads"
+  └── sku_tier                -> module var "sku_tier" (Free / Standard / Premium, default "Free")
 
 iac/live/azure/<stage>/aks/terragrunt.hcl   <- wires env.hcl values into the module (no edits needed to resize)
 
@@ -141,8 +142,9 @@ application profile and availability needs:
 | Workloads pool nodes (max) | `min + 2` (fixed) | Size to expected peak load; consider making the `+2` headroom configurable per stage if prod needs a wider autoscaling range |
 | `sku_tier` | `Free` (no control-plane SLA) | Consider `Standard` for prod — adds an SLA-backed control plane |
 
-`sku_tier` is currently hardcoded to `"Free"` in `iac/modules/azure/aks/main.tf` (not exposed as a
-variable) — expose it as a module input if prod needs `Standard`.
+`sku_tier` is exposed as an `env.hcl` value per stage (defaults to `"Free"` if omitted) — to move
+`prod` to `Standard`, just set `sku_tier = "Standard"` in `iac/live/azure/prod/env.hcl`, no module
+change needed.
 
 ## 7. Related Documents
 
