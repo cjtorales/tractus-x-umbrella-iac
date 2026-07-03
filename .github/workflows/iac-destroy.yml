@@ -1,8 +1,11 @@
-name: iac-bootstrap
+name: iac-destroy
 
-# Manual only. Creates the state backend (resource group + storage account + container)
-# for a cloud/stage. Run ONCE per stage: the bootstrap uses a local backend, so its
-# state is not persisted across runs — re-running after the resources exist will fail.
+# Manual only. Destroys ALL stacks (app stacks under live/) for the selected
+# cloud/stage. Gated by the same GitHub Environments used for apply
+# (environment: dev/test/prod => required reviewers = manual approval).
+# NOTE: for dev to also require approval, add required reviewers to the
+# "dev" environment in Settings -> Environments (apply-dev runs without
+# approval on purpose, but destroy is irreversible for all stages).
 on:
   workflow_dispatch:
     inputs:
@@ -12,7 +15,7 @@ on:
         options: [azure]
         default: azure
       stage:
-        description: Stage
+        description: Stage to destroy COMPLETELY (all stacks)
         type: choice
         options: [dev,test]
 
@@ -28,7 +31,7 @@ env:
   ARM_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
 
 jobs:
-  bootstrap:
+  destroy:
     runs-on: ubuntu-latest
     environment: ${{ inputs.stage }}
     env:
@@ -44,5 +47,5 @@ jobs:
           tg_version: ${{ env.TG_VERSION }}
           tofu_version: ${{ env.TOFU_VERSION }}
           tg_command: --version
-      - name: Bootstrap state backend
-        run: make bootstrap
+      - name: Destroy ${{ inputs.cloud }}/${{ inputs.stage }} (all stacks)
+        run: make destroy-all
